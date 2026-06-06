@@ -13,17 +13,28 @@ function measureTextWidth(text, fontSize, fontWeight) {
   return Math.ceil(ctx.measureText(text || " ").width);
 }
 
+// Cumulative width after each character — needed for the "one letter at a time"
+// typing mode so the reveal lands exactly on each character boundary.
+function measureSentence(text, fontSize, fontWeight) {
+  const prefixes = [0];
+  for (let k = 1; k <= text.length; k++) prefixes.push(measureTextWidth(text.slice(0, k), fontSize, fontWeight));
+  return { text, width: prefixes[prefixes.length - 1] || measureTextWidth(text, fontSize, fontWeight), prefixes };
+}
+
 const TABS = [
   { id: "text", label: "Text" },
   { id: "border", label: "Border" },
+  { id: "background", label: "Background" },
   { id: "effects", label: "Effects" },
 ];
+
+const MAX_SENTENCES = 6;
 
 // ---- paint factories ------------------------------------------------------
 const uid = () => Math.random().toString(36).slice(2, 9);
 const newStop = (color = "#8b7cff") => ({ id: uid(), color, opacity: 100, brightness: 100 });
-const solidPaint = (color) => ({ type: "solid", color, opacity: 100, brightness: 100, angle: 0, stops: [newStop(color)] });
-const gradientPaint = (c1, c2, angle = 0) => ({ type: "gradient", color: c1, opacity: 100, brightness: 100, angle, stops: [newStop(c1), newStop(c2)] });
+const solidPaint = (color) => ({ type: "solid", color, opacity: 100, brightness: 100, angle: 0, anim: "none", animSpeed: 3, animReverse: false, stops: [newStop(color)] });
+const gradientPaint = (c1, c2, angle = 0) => ({ type: "gradient", color: c1, opacity: 100, brightness: 100, angle, anim: "none", animSpeed: 3, animReverse: false, stops: [newStop(c1), newStop(c2)] });
 
 const MAX_STOPS = 8;
 const alphaHex = (o) => Math.round((o / 100) * 255).toString(16).padStart(2, "0");
@@ -176,6 +187,42 @@ function PaintControl({ label, paint, onChange, disabled }) {
           <button type="button" className="add" onClick={addStop} disabled={disabled || paint.stops.length >= MAX_STOPS}>
             + Add colour
           </button>
+
+          <div className="gradanim">
+            <div className="field">
+              <span>Animation</span>
+              <div className="seg">
+                <button type="button" className={paint.anim === "none" ? "on" : ""} disabled={disabled} onClick={() => onChange({ ...paint, anim: "none" })}>None</button>
+                <button type="button" className={paint.anim === "rotate" ? "on" : ""} disabled={disabled} onClick={() => onChange({ ...paint, anim: "rotate" })}>Rotate</button>
+                <button type="button" className={paint.anim === "move" ? "on" : ""} disabled={disabled} onClick={() => onChange({ ...paint, anim: "move" })}>Move</button>
+              </div>
+            </div>
+            {paint.anim !== "none" && (
+              <>
+                <label className="field">
+                  <span>Animation speed — {paint.animSpeed}</span>
+                  <input type="range" min="1" max="10" value={paint.animSpeed} disabled={disabled}
+                    onChange={(e) => onChange({ ...paint, animSpeed: Number(e.target.value) })} />
+                </label>
+                <div className="field">
+                  <span>Direction</span>
+                  <div className="seg">
+                    {paint.anim === "rotate" ? (
+                      <>
+                        <button type="button" className={!paint.animReverse ? "on" : ""} disabled={disabled} onClick={() => onChange({ ...paint, animReverse: false })}>Clockwise</button>
+                        <button type="button" className={paint.animReverse ? "on" : ""} disabled={disabled} onClick={() => onChange({ ...paint, animReverse: true })}>Counter</button>
+                      </>
+                    ) : (
+                      <>
+                        <button type="button" className={!paint.animReverse ? "on" : ""} disabled={disabled} onClick={() => onChange({ ...paint, animReverse: false })}>With gradient</button>
+                        <button type="button" className={paint.animReverse ? "on" : ""} disabled={disabled} onClick={() => onChange({ ...paint, animReverse: true })}>Opposite</button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </>
       )}
     </div>
@@ -187,10 +234,14 @@ export default function App() {
   const [tab, setTab] = useState("text");
   const [copied, setCopied] = useState("");
   const [config, setConfig] = useState({
-    text: "Hello",
+    sentences: ["Mohab", "Software Engineer"],
     fontSize: 40,
     fontWeight: 700,
     animate: true,
+    typingMode: "smooth",
+    typingSpeed: 1,
+    cursor: true,
+    holdDuration: 1.5,
     textPaint: gradientPaint("#41d1ff", "#bd34fe", 0),
     border: false,
     borderWidth: 2,
@@ -211,13 +262,21 @@ export default function App() {
   };
   const setPaint = (key) => (p) => setConfig((c) => ({ ...c, [key]: p }));
 
+  // sentence list helpers
+  const setSentence = (i, text) =>
+    setConfig((c) => ({ ...c, sentences: c.sentences.map((s, idx) => (idx === i ? text : s)) }));
+  const addSentence = () =>
+    setConfig((c) => (c.sentences.length < MAX_SENTENCES ? { ...c, sentences: [...c.sentences, ""] } : c));
+  const removeSentence = (i) =>
+    setConfig((c) => (c.sentences.length > 1 ? { ...c, sentences: c.sentences.filter((_, idx) => idx !== i) } : c));
+
   const svg = useMemo(() => {
-    const textWidth = measureTextWidth(config.text, config.fontSize, config.fontWeight);
-    return generateSvg({ ...config, textWidth });
+    const sentences = config.sentences.map((t) => measureSentence(t, config.fontSize, config.fontWeight));
+    return generateSvg({ ...config, sentences });
   }, [config]);
 
   const dataUri = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-  const markdown = `![${config.text}](./assets/banner.svg)`;
+  const markdown = `![${config.sentences[0] || "banner"}](./assets/banner.svg)`;
 
   async function copy(value, which) {
     await navigator.clipboard.writeText(value);
@@ -272,10 +331,29 @@ export default function App() {
           <div className="tabpanel">
             {tab === "text" && (
               <>
-                <label className="field">
-                  <span>Text</span>
-                  <input type="text" value={config.text} onChange={set("text")} maxLength={40} />
-                </label>
+                <div className="field">
+                  <span>Sentences{config.sentences.length > 1 ? " (cycle in order)" : ""}</span>
+                  <div className="sentences">
+                    {config.sentences.map((s, i) => (
+                      <div className="sentence-row" key={i}>
+                        <input
+                          type="text"
+                          value={s}
+                          onChange={(e) => setSentence(i, e.target.value)}
+                          maxLength={40}
+                          placeholder={`Sentence ${i + 1}`}
+                        />
+                        {config.sentences.length > 1 && (
+                          <button type="button" className="remove" onClick={() => removeSentence(i)} aria-label="Remove sentence">✕</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <button type="button" className="add" onClick={addSentence} disabled={config.sentences.length >= MAX_SENTENCES}>
+                    + Add sentence
+                  </button>
+                </div>
+
                 <PaintControl label="Text colour" paint={config.textPaint} onChange={setPaint("textPaint")} />
                 <label className="field">
                   <span>Font size — {config.fontSize}px</span>
@@ -286,9 +364,38 @@ export default function App() {
                   <input type="range" min="400" max="800" step="100" value={config.fontWeight} onChange={set("fontWeight")} />
                 </label>
                 <label className="toggle">
+                  <input type="checkbox" checked={config.glow} onChange={set("glow")} />
+                  <span>Text glow</span>
+                </label>
+
+                <label className="toggle">
                   <input type="checkbox" checked={config.animate} onChange={set("animate")} />
                   <span>Typing animation</span>
                 </label>
+
+                {config.animate && (
+                  <div className="subgroup">
+                    <div className="field">
+                      <span>Typing style</span>
+                      <div className="seg">
+                        <button type="button" className={config.typingMode === "smooth" ? "on" : ""} onClick={() => setConfig((c) => ({ ...c, typingMode: "smooth" }))}>Smooth</button>
+                        <button type="button" className={config.typingMode === "char" ? "on" : ""} onClick={() => setConfig((c) => ({ ...c, typingMode: "char" }))}>Letter by letter</button>
+                      </div>
+                    </div>
+                    <label className="toggle">
+                      <input type="checkbox" checked={config.cursor} onChange={set("cursor")} />
+                      <span>Show cursor</span>
+                    </label>
+                    <label className="field">
+                      <span>Typing speed — {config.typingSpeed}x</span>
+                      <input type="range" min="0.5" max="4" step="0.5" value={config.typingSpeed} onChange={set("typingSpeed")} />
+                    </label>
+                    <label className="field">
+                      <span>Time between sentences — {config.holdDuration}s</span>
+                      <input type="range" min="0.5" max="5" step="0.5" value={config.holdDuration} onChange={set("holdDuration")} />
+                    </label>
+                  </div>
+                )}
               </>
             )}
 
@@ -310,14 +417,12 @@ export default function App() {
               </>
             )}
 
+            {tab === "background" && (
+              <PaintControl label="Background" paint={config.bgPaint} onChange={setPaint("bgPaint")} />
+            )}
+
             {tab === "effects" && (
-              <>
-                <PaintControl label="Background" paint={config.bgPaint} onChange={setPaint("bgPaint")} />
-                <label className="toggle">
-                  <input type="checkbox" checked={config.glow} onChange={set("glow")} />
-                  <span>Text glow</span>
-                </label>
-              </>
+              <div className="empty-tab">More effects coming soon.</div>
             )}
           </div>
         </aside>
@@ -326,7 +431,7 @@ export default function App() {
         <section className="preview">
           <h2>Preview</h2>
           <div className="stage">
-            <img key={dataUri} src={dataUri} alt={config.text} />
+            <img key={dataUri} src={dataUri} alt={config.sentences[0] || "preview"} />
           </div>
         </section>
 

@@ -157,6 +157,25 @@ input:disabled { opacity: 0.45; cursor: not-allowed; }
 .toggle { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 500; cursor: pointer; margin-bottom: 20px; }
 .toggle input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
 
+/* ---- sentence list + typing options ---- */
+.sentences { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.sentence-row { display: flex; align-items: center; gap: 8px; }
+.sentence-row input[type="text"] { flex: 1; }
+
+.subgroup {
+  margin: 4px 0 20px; padding: 16px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--panel-2);
+}
+.subgroup .field:last-child, .subgroup .toggle:last-child { margin-bottom: 0; }
+.field .seg { display: flex; width: 100%; }
+.field .seg button { flex: 1; }
+
+.empty-tab { color: var(--muted); font-size: 14px; text-align: center; padding: 48px 12px; }
+
+/* ---- gradient animation subsection ---- */
+.gradanim { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border); }
+.gradanim .field:last-child { margin-bottom: 0; }
+
 /* ---- paint control ---- */
 .paint {
   border: 1px solid var(--border); border-radius: 14px;
