@@ -327,15 +327,9 @@ export function generateSvg(config) {
   return wrap(width, height, geo[0].text, inner, linkUrl);
 }
 
-function wrap(width, height, label, inner, linkUrl = "") {
-  const link = normalizeUrl(linkUrl);
-  const body = link
-    ? `<a href="${escapeXml(link)}" xlink:href="${escapeXml(link)}" target="_blank" rel="noopener">
-    ${inner}
-  </a>`
-    : inner;
-  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(label)}">
-  ${body}
+function wrap(width, height, label, inner) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(label)}">
+  ${inner}
 </svg>`;
 }
 

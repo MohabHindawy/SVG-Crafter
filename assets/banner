@@ -1,6 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="276" height="88" viewBox="0 0 276 88" role="img" aria-label="Hello">
-  <a href="https://www.youtube.com/watch?v=BlSXxA1o1-Y" xlink:href="https://www.youtube.com/watch?v=BlSXxA1o1-Y" target="_blank" rel="noopener">
-    <style>
+<svg xmlns="http://www.w3.org/2000/svg" width="276" height="88" viewBox="0 0 276 88" role="img" aria-label="Hello">
+  <style>
     .cursor { animation: blink 1s steps(1) infinite; }
     @keyframes blink { 50% { opacity: 0; } }
   </style>
@@ -26,5 +25,4 @@
   <rect class="cursor" x="28" y="24" width="3" height="40" fill="#41d1ff" fill-opacity="1">
     <animate attributeName="x" values="28;128;128;28;248;248;28" keyTimes="0;0.104839;0.346774;0.403226;0.633871;0.875806;1" dur="6.2s" calcMode="linear" repeatCount="indefinite"/>
   </rect>
-  </a>
 </svg>
