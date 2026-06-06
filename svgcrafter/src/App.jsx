@@ -291,7 +291,7 @@ export default function App() {
   const [tab, setTab] = useState("text");
   const [copied, setCopied] = useState("");
   const [config, setConfig] = useState({
-    sentences: ["Mohab", "Software Engineer"],
+    sentences: ["Hello", "SVG Crafter"],
     sentenceAligns: ["left", "left"],
     fontSize: 40,
     fontWeight: 700,
