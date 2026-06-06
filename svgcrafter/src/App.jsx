@@ -1,11 +1,10 @@
-// App.jsx
-import { useMemo, useState } from "react";
-import { generateSvg } from "./generateSvg";
+import { useEffect, useMemo, useState } from "react";
+import { generateSvg, adjustBrightness } from "./generateSvg";
 import "./App.css";
+import sunIcon from "../public/LightMode.svg";
+import moonIcon from "../public/DarkMode.svg";
 
-// Measures real rendered text width with a canvas so the typing animation
-// and the SVG width fit the text exactly. This is the one piece that needs
-// the DOM, which is why it lives here and not in generateSvg.js.
+// Real text measurement (needs the DOM, so it stays out of generateSvg).
 function measureTextWidth(text, fontSize, fontWeight) {
   const canvas =
     measureTextWidth._c || (measureTextWidth._c = document.createElement("canvas"));
@@ -14,28 +13,165 @@ function measureTextWidth(text, fontSize, fontWeight) {
   return Math.ceil(ctx.measureText(text || " ").width);
 }
 
-// const FONT = "'Segoe UI', system-ui, -apple-system, Arial, sans-serif";
+const TABS = [
+  { id: "text", label: "Text" },
+  { id: "border", label: "Border" },
+  { id: "effects", label: "Effects" },
+];
+
+// ---- paint factories ------------------------------------------------------
+const uid = () => Math.random().toString(36).slice(2, 9);
+const newStop = (color = "#8b7cff") => ({ id: uid(), color, opacity: 100, brightness: 100 });
+const solidPaint = (color) => ({ type: "solid", color, opacity: 100, brightness: 100, angle: 0, stops: [newStop(color)] });
+const gradientPaint = (c1, c2, angle = 0) => ({ type: "gradient", color: c1, opacity: 100, brightness: 100, angle, stops: [newStop(c1), newStop(c2)] });
+
+const MAX_STOPS = 8;
+const alphaHex = (o) => Math.round((o / 100) * 255).toString(16).padStart(2, "0");
+
+// CSS preview of a gradient paint (CSS angle = svg angle + 90).
+function cssGradient(paint) {
+  const cssAngle = (Number(paint.angle) || 0) + 90;
+  const stops = paint.stops
+    .map((s, i, arr) => {
+      const offset = arr.length <= 1 ? 0 : (i / (arr.length - 1)) * 100;
+      return `${adjustBrightness(s.color, s.brightness)}${alphaHex(s.opacity)} ${offset}%`;
+    })
+    .join(", ");
+  return `linear-gradient(${cssAngle}deg, ${stops})`;
+}
+
+// One editable colour: swatch + opacity + brightness (reused for solid & stops).
+function StopRow({ value, onChange, onRemove, onMoveUp, onMoveDown, disabled }) {
+  const patch = (p) => onChange({ ...value, ...p });
+  return (
+    <div className="stoprow">
+      {onMoveUp && (
+        <div className="reorder">
+          <button type="button" onClick={onMoveUp} disabled={disabled} aria-label="Move up">▲</button>
+          <button type="button" onClick={onMoveDown} disabled={disabled} aria-label="Move down">▼</button>
+        </div>
+      )}
+      <input type="color" value={value.color} disabled={disabled}
+        onChange={(e) => patch({ color: e.target.value })} />
+      <div className="sliders">
+        <label><i>Opacity</i>
+          <input type="range" min="0" max="100" value={value.opacity} disabled={disabled}
+            onChange={(e) => patch({ opacity: Number(e.target.value) })} />
+          <em>{value.opacity}%</em>
+        </label>
+        <label><i>Brightness</i>
+          <input type="range" min="0" max="200" value={value.brightness} disabled={disabled}
+            onChange={(e) => patch({ brightness: Number(e.target.value) })} />
+          <em>{value.brightness}%</em>
+        </label>
+      </div>
+      {onRemove && (
+        <button type="button" className="remove" onClick={onRemove} disabled={disabled} aria-label="Remove colour">✕</button>
+      )}
+    </div>
+  );
+}
+
+// Full paint editor: solid/gradient switch, stop list, reorder, direction.
+function PaintControl({ label, paint, onChange, disabled }) {
+  const isGrad = paint.type === "gradient";
+
+  const setType = (type) => {
+    if (type === "gradient" && paint.stops.length < 2) {
+      onChange({ ...paint, type, stops: [newStop(paint.color), newStop("#bd34fe")] });
+    } else {
+      onChange({ ...paint, type });
+    }
+  };
+
+  const setStops = (stops) => onChange({ ...paint, stops });
+  const updateStop = (i, next) => setStops(paint.stops.map((s, idx) => (idx === i ? next : s)));
+  const addStop = () => paint.stops.length < MAX_STOPS && setStops([...paint.stops, newStop("#41d1ff")]);
+  const removeStop = (i) => paint.stops.length > 2 && setStops(paint.stops.filter((_, idx) => idx !== i));
+  const move = (i, dir) => {
+    const j = i + dir;
+    if (j < 0 || j >= paint.stops.length) return;
+    const next = [...paint.stops];
+    [next[i], next[j]] = [next[j], next[i]];
+    setStops(next);
+  };
+
+  return (
+    <div className={"paint" + (disabled ? " is-disabled" : "")}>
+      <div className="paint-head">
+        <span>{label}</span>
+        <div className="seg">
+          <button type="button" className={!isGrad ? "on" : ""} disabled={disabled} onClick={() => setType("solid")}>Solid</button>
+          <button type="button" className={isGrad ? "on" : ""} disabled={disabled} onClick={() => setType("gradient")}>Gradient</button>
+        </div>
+      </div>
+
+      {!isGrad && (
+        <StopRow
+          value={{ color: paint.color, opacity: paint.opacity, brightness: paint.brightness }}
+          onChange={(v) => onChange({ ...paint, ...v })}
+          disabled={disabled}
+        />
+      )}
+
+      {isGrad && (
+        <>
+          <div className="gradbar" style={{ background: disabled ? "var(--panel-2)" : cssGradient(paint) }} />
+          <label className="field dir">
+            <span>Direction — {paint.angle}°</span>
+            <input type="range" min="0" max="360" value={paint.angle} disabled={disabled}
+              onChange={(e) => onChange({ ...paint, angle: Number(e.target.value) })} />
+          </label>
+          <div className="stops">
+            {paint.stops.map((s, i) => (
+              <StopRow
+                key={s.id}
+                value={s}
+                onChange={(v) => updateStop(i, v)}
+                onRemove={paint.stops.length > 2 ? () => removeStop(i) : undefined}
+                onMoveUp={() => move(i, -1)}
+                onMoveDown={() => move(i, 1)}
+                disabled={disabled}
+              />
+            ))}
+          </div>
+          <button type="button" className="add" onClick={addStop} disabled={disabled || paint.stops.length >= MAX_STOPS}>
+            + Add colour
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function App() {
+  const [theme, setTheme] = useState("dark");
+  const [tab, setTab] = useState("text");
+  const [copied, setCopied] = useState("");
   const [config, setConfig] = useState({
     text: "Mohab",
-    textColor: "#bef264",
-    bgColor: "#0a0a0a",
     fontSize: 40,
     fontWeight: 700,
     animate: true,
+    textPaint: gradientPaint("#41d1ff", "#bd34fe", 0),
+    border: false,
+    borderWidth: 2,
     borderRadius: 14,
+    borderPaint: gradientPaint("#41d1ff", "#bd34fe", 0),
+    bgPaint: solidPaint("#14142b"),
+    glow: false,
   });
-  const [copied, setCopied] = useState("");
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
 
   const set = (key) => (e) => {
     const el = e.target;
     const value = el.type === "checkbox" ? el.checked : el.value;
-    setConfig((c) => ({
-      ...c,
-      [key]: el.type === "range" ? Number(value) : value,
-    }));
+    setConfig((c) => ({ ...c, [key]: el.type === "range" ? Number(value) : value }));
   };
+  const setPaint = (key) => (p) => setConfig((c) => ({ ...c, [key]: p }));
 
   const svg = useMemo(() => {
     const textWidth = measureTextWidth(config.text, config.fontSize, config.fontWeight);
@@ -64,62 +200,98 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <span className="dot" /> svg<span className="accent">forge</span>
-        <span className="sub">// github profile banner generator</span>
+        <div className="brand">
+          <span className="dot" />
+          <span className="wordmark">SVG <span className="accent">Crafter</span></span>
+          <span className="tagline">GitHub profile banner generator</span>
+        </div>
+        <button className="theme-toggle" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+          <img
+            src={theme === "dark" ? sunIcon : moonIcon}
+            alt={theme === "dark" ? "Light mode" : "Dark mode"}
+            width={24}
+            height={24}
+          />
+        </button>
       </header>
 
       <main className="layout">
-        <section className="panel controls">
-          <h2>Customize</h2>
-
-          <label className="field">
-            <span>Text</span>
-            <input type="text" value={config.text} onChange={set("text")} maxLength={40} />
-          </label>
-
-          <div className="row">
-            <label className="field">
-              <span>Text color</span>
-              <input type="color" value={config.textColor} onChange={set("textColor")} />
-            </label>
-            <label className="field">
-              <span>Background</span>
-              <input type="color" value={config.bgColor} onChange={set("bgColor")} />
-            </label>
+        <section className="controls">
+          <div className="tabs" role="tablist">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                role="tab"
+                aria-selected={tab === t.id}
+                className={tab === t.id ? "tab active" : "tab"}
+                onClick={() => setTab(t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
 
-          <label className="field">
-            <span>Font size — {config.fontSize}px</span>
-            <input type="range" min="20" max="72" value={config.fontSize} onChange={set("fontSize")} />
-          </label>
+          <div className="tabpanel">
+            {tab === "text" && (
+              <>
+                <label className="field">
+                  <span>Text</span>
+                  <input type="text" value={config.text} onChange={set("text")} maxLength={40} />
+                </label>
+                <PaintControl label="Text colour" paint={config.textPaint} onChange={setPaint("textPaint")} />
+                <label className="field">
+                  <span>Font size — {config.fontSize}px</span>
+                  <input type="range" min="20" max="72" value={config.fontSize} onChange={set("fontSize")} />
+                </label>
+                <label className="field">
+                  <span>Font weight — {config.fontWeight}</span>
+                  <input type="range" min="400" max="800" step="100" value={config.fontWeight} onChange={set("fontWeight")} />
+                </label>
+                <label className="toggle">
+                  <input type="checkbox" checked={config.animate} onChange={set("animate")} />
+                  <span>Typing animation</span>
+                </label>
+              </>
+            )}
 
-          <label className="field">
-            <span>Font weight — {config.fontWeight}</span>
-            <input type="range" min="400" max="800" step="100" value={config.fontWeight} onChange={set("fontWeight")} />
-          </label>
+            {tab === "border" && (
+              <>
+                <label className="toggle">
+                  <input type="checkbox" checked={config.border} onChange={set("border")} />
+                  <span>Show border</span>
+                </label>
+                <PaintControl label="Border colour" paint={config.borderPaint} onChange={setPaint("borderPaint")} disabled={!config.border} />
+                <label className="field">
+                  <span>Border width — {config.borderWidth}px</span>
+                  <input type="range" min="1" max="10" value={config.borderWidth} onChange={set("borderWidth")} disabled={!config.border} />
+                </label>
+                <label className="field">
+                  <span>Corner radius — {config.borderRadius}px</span>
+                  <input type="range" min="0" max="40" value={config.borderRadius} onChange={set("borderRadius")} />
+                </label>
+              </>
+            )}
 
-          <label className="field">
-            <span>Corner radius — {config.borderRadius}px</span>
-            <input type="range" min="0" max="40" value={config.borderRadius} onChange={set("borderRadius")} />
-          </label>
-
-          <label className="toggle">
-            <input type="checkbox" checked={config.animate} onChange={set("animate")} />
-            <span>Typing animation</span>
-          </label>
+            {tab === "effects" && (
+              <>
+                <PaintControl label="Background" paint={config.bgPaint} onChange={setPaint("bgPaint")} />
+                <label className="toggle">
+                  <input type="checkbox" checked={config.glow} onChange={set("glow")} />
+                  <span>Text glow</span>
+                </label>
+              </>
+            )}
+          </div>
         </section>
 
         <section className="panel preview">
           <h2>Preview</h2>
           <div className="stage">
-            {/* Rendered as <img>, exactly how GitHub will show it */}
             <img key={dataUri} src={dataUri} alt={config.text} />
           </div>
 
           <div className="actions">
-            <button onClick={() => copy(svg, "svg")}>
-              {copied === "svg" ? "Copied ✓" : "Copy SVG"}
-            </button>
+            <button onClick={() => copy(svg, "svg")}>{copied === "svg" ? "Copied" : "Copy SVG"}</button>
             <button onClick={download}>Download .svg</button>
           </div>
 
@@ -127,13 +299,11 @@ export default function App() {
             <span>README snippet</span>
             <div className="snippet">
               <code>{markdown}</code>
-              <button className="ghost" onClick={() => copy(markdown, "md")}>
-                {copied === "md" ? "✓" : "copy"}
-              </button>
+              <button className="ghost" onClick={() => copy(markdown, "md")}>{copied === "md" ? "copied" : "copy"}</button>
             </div>
           </label>
           <p className="hint">
-            Drop <code>banner.svg</code> in an <code>assets/</code> folder in your repo,
+            Drop <code>banner.svg</code> into an <code>assets</code> folder in your repo,
             then paste the snippet into your README.
           </p>
         </section>
