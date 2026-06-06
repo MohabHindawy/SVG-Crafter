@@ -14,10 +14,20 @@
 const FONT_STACK = "'Segoe UI', system-ui, -apple-system, Arial, sans-serif";
 const CHAR_TYPE = 0.13;   // seconds per character while typing
 const CHAR_DELETE = 0.07; // seconds per character while deleting
+const PADDING = 28;       // horizontal text inset used by auto-sizing
 
 const op = (v) => Math.max(0, Math.min(100, Number(v))) / 100;
 const round = (n, d = 3) => Number(Number(n).toFixed(d));
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+
+// The dimensions the banner takes when sized to fit the text. Exported so the
+// UI can seed its width/height sliders with the live auto value (one formula,
+// no drift between the app and the generator).
+export function autoSize(sentences = [], fontSize = 40) {
+  const widths = sentences.map((s) => s.width || 0);
+  const maxWidth = Math.max(...widths, 40);
+  return { width: Math.round(maxWidth + PADDING * 2), height: Math.round(fontSize * 2.2) };
+}
 
 // --- colour helpers --------------------------------------------------------
 function hexToRgb(hex) {
@@ -139,8 +149,10 @@ function buildTimeline(sentences, mode, holdDuration, speed = 1) {
   };
 
   // Cursor follows whichever sentence is active (slots are contiguous).
+  // Points are absolute x (sentence start offset + revealed width) so the
+  // cursor lands correctly for centred / right / justified sentences.
   const cursorPts = [];
-  for (const s of slots) for (const [t, w] of slotPoints(s)) cursorPts.push([s.S + t, w]);
+  for (const s of slots) for (const [t, w] of slotPoints(s)) cursorPts.push([s.S + t, (s.startX || 0) + w]);
 
   return { T, slots, perSentence: slots.map(toFull), cursorPts };
 }
@@ -169,6 +181,8 @@ export function generateSvg(config) {
     sentences = [{ text: "Your Name", width: 220, prefixes: [] }],
     fontSize = 40,
     fontWeight = 700,
+    fontFamily = FONT_STACK,
+    embedFont = null,        // { family, dataUrl, format } -> embedded @font-face
     animate = true,
     typingMode = "smooth",
     typingSpeed = 1,
@@ -181,16 +195,50 @@ export function generateSvg(config) {
     borderPaint,
     bgPaint,
     glow = false,
+    autoWidth = true,        // false -> use bannerWidth
+    bannerWidth = 600,
+    autoHeight = true,       // false -> use bannerHeight
+    bannerHeight = 120,
+    linkUrl = "",            // wraps the SVG in a clickable <a>
   } = config;
 
   const live = sentences.filter((s) => s.text && s.text.length);
   const list = live.length ? live : [{ text: " ", width: 40, prefixes: [0, 40] }];
-  const padding = 28;
-  const maxWidth = Math.max(...list.map((s) => s.width), 40);
-  const width = Math.round(maxWidth + padding * 2);
-  const height = Math.round(fontSize * 2.2);
+  const padding = PADDING;
+  const auto = autoSize(list, fontSize);
+  const width = autoWidth ? auto.width : Math.round(clamp(Number(bannerWidth) || auto.width, 80, 4000));
+  const height = autoHeight ? auto.height : Math.round(clamp(Number(bannerHeight) || auto.height, 40, 2000));
   const baseline = Math.round(height / 2 + fontSize * 0.35);
   const cursorY = Math.round((height - fontSize) / 2);
+
+  // Per-sentence alignment geometry. The banner width hugs the longest
+  // sentence, so shorter sentences have room to sit left / centre / right
+  // within the content band. "justify" stretches a multi-word sentence to
+  // fill the band via textLength + lengthAdjust="spacing"; the per-character
+  // prefixes are widened by the same uniform spacing so the letter-by-letter
+  // reveal still lands ~on character boundaries. Anchor stays fixed: each
+  // sentence renders at its final aligned x and reveals left-to-right.
+  const contentWidth = width - padding * 2;
+  const geo = list.map((s) => {
+    const align = s.align || "left";
+    const canJustify = align === "justify" && /\s/.test(s.text) && s.width < contentWidth;
+    const renderWidth = canJustify ? contentWidth : s.width;
+    const extra = renderWidth - s.width;
+    const N = Math.max(1, (s.text || "").length);
+    const slack = Math.max(0, contentWidth - renderWidth);
+    let startX = padding;
+    if (align === "center") startX = padding + slack / 2;
+    else if (align === "right") startX = padding + slack;
+    return {
+      text: s.text,
+      width: renderWidth,
+      prefixes: (s.prefixes || []).map((p, k) => p + extra * (k / N)),
+      align,
+      justified: canJustify,
+      startX: round(startX, 2),
+    };
+  });
+  const justifyAttr = (g) => (g.justified ? ` textLength="${round(g.width, 2)}" lengthAdjust="spacing"` : "");
 
   const defs = [];
   const bg = resolvePaint(bgPaint, "bgPaint", defs);
@@ -215,63 +263,88 @@ export function generateSvg(config) {
 
   const textAttrs =
     `fill="${txt.fill}" fill-opacity="${txt.opacity}" ` +
-    `font-family="${FONT_STACK}" font-size="${fontSize}" font-weight="${fontWeight}"` +
+    `font-family="${fontFamily}" font-size="${fontSize}" font-weight="${fontWeight}"` +
     (glow ? ` filter="url(#glow)"` : "");
+
+  // A custom imported font is embedded as base64 so the SVG renders identically
+  // everywhere (GitHub's proxy won't fetch external fonts).
+  const fontFaceCss =
+    embedFont && embedFont.dataUrl
+      ? `@font-face { font-family: '${embedFont.family}'; src: url('${embedFont.dataUrl}') format('${embedFont.format || "woff2"}'); font-weight: 100 900; font-style: normal; font-display: block; }`
+      : "";
+  const styleBlock = (parts) => {
+    const body = parts.filter(Boolean).join("\n    ");
+    return body ? `<style>\n    ${body}\n  </style>` : "";
+  };
 
   // --- static ----------------------------------------------------------------
   if (!animate) {
+    const g0 = geo[0];
     const inner = [
+      styleBlock([fontFaceCss]),
       defs.length ? `<defs>\n    ${defs.join("\n    ")}\n  </defs>` : "",
       bgRect,
-      `<text x="${padding}" y="${baseline}" ${textAttrs}>${escapeXml(list[0].text)}</text>`,
+      `<text x="${g0.startX}" y="${baseline}" ${textAttrs}${justifyAttr(g0)}>${escapeXml(g0.text)}</text>`,
     ].filter(Boolean).join("\n  ");
-    return wrap(width, height, list[0].text, inner);
+    return wrap(width, height, g0.text, inner, linkUrl);
   }
 
   // --- animated --------------------------------------------------------------
   const mode = typingMode === "char" ? "char" : "smooth";
   const calcMode = mode === "char" ? "discrete" : "linear";
-  const { T, perSentence, cursorPts } = buildTimeline(list, mode, holdDuration, Math.max(0.1, Number(typingSpeed) || 1));
+  const { T, perSentence, cursorPts } = buildTimeline(geo, mode, holdDuration, Math.max(0.1, Number(typingSpeed) || 1));
 
   const texts = [];
-  list.forEach((s, i) => {
+  geo.forEach((s, i) => {
     const a = toAnim(perSentence[i], T);
     defs.push(`<clipPath id="clip${i}">
-      <rect x="${padding}" y="0" width="0" height="${height}">
+      <rect x="${s.startX}" y="0" width="0" height="${height}">
         <animate attributeName="width" values="${a.values}" keyTimes="${a.keyTimes}" dur="${round(T, 2)}s" calcMode="${calcMode}" repeatCount="indefinite"/>
       </rect>
     </clipPath>`);
-    texts.push(`<text x="${padding}" y="${baseline}" ${textAttrs} clip-path="url(#clip${i})">${escapeXml(s.text)}</text>`);
+    texts.push(`<text x="${s.startX}" y="${baseline}" ${textAttrs}${justifyAttr(s)} clip-path="url(#clip${i})">${escapeXml(s.text)}</text>`);
   });
 
   let cursorEl = "";
-  let styleEl = "";
+  let cursorCss = "";
   if (cursor) {
-    const ca = toAnim(cursorPts, T, (w) => padding + w);
-    styleEl = `<style>
-    .cursor { animation: blink 1s steps(1) infinite; }
-    @keyframes blink { 50% { opacity: 0; } }
-  </style>`;
-    cursorEl = `<rect class="cursor" x="${padding}" y="${cursorY}" width="3" height="${fontSize}" fill="${main.color}" fill-opacity="${main.opacity}">
+    const ca = toAnim(cursorPts, T); // points are already absolute x
+    cursorCss = `.cursor { animation: blink 1s steps(1) infinite; }
+    @keyframes blink { 50% { opacity: 0; } }`;
+    cursorEl = `<rect class="cursor" x="${geo[0].startX}" y="${cursorY}" width="3" height="${fontSize}" fill="${main.color}" fill-opacity="${main.opacity}">
     <animate attributeName="x" values="${ca.values}" keyTimes="${ca.keyTimes}" dur="${round(T, 2)}s" calcMode="${calcMode}" repeatCount="indefinite"/>
   </rect>`;
   }
 
   const inner = [
-    styleEl,
+    styleBlock([fontFaceCss, cursorCss]),
     `<defs>\n    ${defs.join("\n    ")}\n  </defs>`,
     bgRect,
     ...texts,
     cursorEl,
   ].filter(Boolean).join("\n  ");
 
-  return wrap(width, height, list[0].text, inner);
+  return wrap(width, height, geo[0].text, inner, linkUrl);
 }
 
-function wrap(width, height, label, inner) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(label)}">
-  ${inner}
+function wrap(width, height, label, inner, linkUrl = "") {
+  const link = normalizeUrl(linkUrl);
+  const body = link
+    ? `<a href="${escapeXml(link)}" xlink:href="${escapeXml(link)}" target="_blank" rel="noopener">
+    ${inner}
+  </a>`
+    : inner;
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(label)}">
+  ${body}
 </svg>`;
+}
+
+// Accept bare domains by defaulting to https; pass through http/https/mailto.
+export function normalizeUrl(url) {
+  const u = String(url || "").trim();
+  if (!u) return "";
+  if (/^(https?:|mailto:)/i.test(u)) return u;
+  return "https://" + u.replace(/^\/+/, "");
 }
 
 function escapeXml(s) {
