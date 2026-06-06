@@ -41,12 +41,33 @@ function cssGradient(paint) {
 }
 
 // One editable colour: swatch + opacity + brightness (reused for solid & stops).
-function StopRow({ value, onChange, onRemove, onMoveUp, onMoveDown, disabled }) {
+function StopRow({ value, onChange, onRemove, onMoveUp, onMoveDown, disabled, dragging, onDragStart, onDragEnter, onDragEnd }) {
   const patch = (p) => onChange({ ...value, ...p });
+  const isReorderable = Boolean(onMoveUp);
   return (
-    <div className="stoprow">
-      {onMoveUp && (
+    <div
+      className={"stoprow" + (dragging ? " dragging" : "")}
+      onDragEnter={isReorderable ? onDragEnter : undefined}
+      onDragOver={isReorderable ? (e) => e.preventDefault() : undefined}
+      onDrop={isReorderable ? (e) => e.preventDefault() : undefined}
+      onDragEnd={isReorderable ? onDragEnd : undefined}
+    >
+      {isReorderable && (
         <div className="reorder">
+          <span
+            className="grip"
+            draggable={!disabled}
+            onDragStart={(e) => {
+              e.dataTransfer.effectAllowed = "move";
+              e.dataTransfer.setData("text/plain", "");
+              onDragStart && onDragStart();
+            }}
+            role="button"
+            aria-label="Drag to reorder"
+            title="Drag to reorder"
+          >
+            ⠿
+          </span>
           <button type="button" onClick={onMoveUp} disabled={disabled} aria-label="Move up">▲</button>
           <button type="button" onClick={onMoveDown} disabled={disabled} aria-label="Move down">▼</button>
         </div>
@@ -75,6 +96,7 @@ function StopRow({ value, onChange, onRemove, onMoveUp, onMoveDown, disabled }) 
 // Full paint editor: solid/gradient switch, stop list, reorder, direction.
 function PaintControl({ label, paint, onChange, disabled }) {
   const isGrad = paint.type === "gradient";
+  const [dragId, setDragId] = useState(null);
 
   const setType = (type) => {
     if (type === "gradient" && paint.stops.length < 2) {
@@ -93,6 +115,18 @@ function PaintControl({ label, paint, onChange, disabled }) {
     if (j < 0 || j >= paint.stops.length) return;
     const next = [...paint.stops];
     [next[i], next[j]] = [next[j], next[i]];
+    setStops(next);
+  };
+
+  // Drag-to-reorder: reorder live as the dragged stop passes over others.
+  const dragOver = (overId) => {
+    if (dragId == null || dragId === overId) return;
+    const from = paint.stops.findIndex((s) => s.id === dragId);
+    const to = paint.stops.findIndex((s) => s.id === overId);
+    if (from === -1 || to === -1 || from === to) return;
+    const next = [...paint.stops];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
     setStops(next);
   };
 
@@ -132,6 +166,10 @@ function PaintControl({ label, paint, onChange, disabled }) {
                 onMoveUp={() => move(i, -1)}
                 onMoveDown={() => move(i, 1)}
                 disabled={disabled}
+                dragging={dragId === s.id}
+                onDragStart={() => setDragId(s.id)}
+                onDragEnter={() => dragOver(s.id)}
+                onDragEnd={() => setDragId(null)}
               />
             ))}
           </div>
@@ -149,7 +187,7 @@ export default function App() {
   const [tab, setTab] = useState("text");
   const [copied, setCopied] = useState("");
   const [config, setConfig] = useState({
-    text: "Mohab",
+    text: "Hello",
     fontSize: 40,
     fontWeight: 700,
     animate: true,
@@ -215,8 +253,8 @@ export default function App() {
         </button>
       </header>
 
-      <main className="layout">
-        <section className="controls">
+      <div className="workspace">
+        <aside className="sidebar">
           <div className="tabs" role="tablist">
             {TABS.map((t) => (
               <button
@@ -282,14 +320,18 @@ export default function App() {
               </>
             )}
           </div>
-        </section>
+        </aside>
 
-        <section className="panel preview">
+        <main className="main">
+        <section className="preview">
           <h2>Preview</h2>
           <div className="stage">
             <img key={dataUri} src={dataUri} alt={config.text} />
           </div>
+        </section>
 
+        <section className="export">
+          <h2>Export</h2>
           <div className="actions">
             <button onClick={() => copy(svg, "svg")}>{copied === "svg" ? "Copied" : "Copy SVG"}</button>
             <button onClick={download}>Download .svg</button>
@@ -302,12 +344,19 @@ export default function App() {
               <button className="ghost" onClick={() => copy(markdown, "md")}>{copied === "md" ? "copied" : "copy"}</button>
             </div>
           </label>
-          <p className="hint">
-            Drop <code>banner.svg</code> into an <code>assets</code> folder in your repo,
-            then paste the snippet into your README.
-          </p>
+
+          <div className="guide">
+            <h3>How to use</h3>
+            <ol>
+              <li>Customise your banner with the panel on the left.</li>
+              <li>Hit <b>Download .svg</b>, or <b>Copy SVG</b> to grab the markup.</li>
+              <li>Add the file to an <code>assets</code> folder in your profile repo.</li>
+              <li>Paste the snippet above into your <code>README.md</code>.</li>
+            </ol>
+          </div>
         </section>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

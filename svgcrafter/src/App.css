@@ -47,10 +47,13 @@ body {
   transition: background 0.3s, color 0.3s;
 }
 
-.app { max-width: 1080px; margin: 0 auto; padding: 30px 24px 64px; }
+.app { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
 /* ---- header ---- */
-.topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 30px; }
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 22px; border-bottom: 1px solid var(--border); flex: none;
+}
 .brand { display: flex; align-items: baseline; gap: 12px; }
 .wordmark { font-family: var(--font-display); font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
 .wordmark .accent {
@@ -80,40 +83,59 @@ body {
   transform: translateY(1px);
 }
 
-.layout { display: grid; grid-template-columns: 1fr 1.2fr; gap: 20px; align-items: start; }
-@media (max-width: 760px) { .layout { grid-template-columns: 1fr; } }
+.workspace { flex: 1; display: flex; min-height: 0; }
 
-/* ---- folder tabs ---- */
-.tabs { display: flex; gap: 4px; padding-left: 8px; }
+.sidebar {
+  width: 380px; flex: none; border-right: 1px solid var(--border);
+  background: var(--panel); overflow-y: auto;
+}
+
+.main { flex: 1; display: flex; min-width: 0; }
+.preview {
+  flex: 1; min-width: 0; display: flex; flex-direction: column;
+  padding: 22px; overflow-y: auto;
+}
+.export {
+  width: 340px; flex: none; border-left: 1px solid var(--border);
+  padding: 22px; overflow-y: auto;
+}
+
+@media (max-width: 1100px) {
+  .sidebar { width: 340px; }
+  .export { width: 300px; }
+}
+
+/* Stack on small screens with normal page scroll. */
+@media (max-width: 860px) {
+  .app { height: auto; overflow: visible; }
+  .workspace { display: block; }
+  .sidebar { width: auto; border-right: none; border-bottom: 1px solid var(--border); overflow: visible; }
+  .main { display: block; }
+  .preview { overflow: visible; }
+  .export { width: auto; border-left: none; border-top: 1px solid var(--border); overflow: visible; }
+}
+
+/* ---- sidebar tabs (sticky underline) ---- */
+.tabs {
+  position: sticky; top: 0; z-index: 1;
+  display: flex; gap: 2px; padding: 0 14px;
+  background: var(--panel); border-bottom: 1px solid var(--border);
+}
 .tab {
-  background: var(--panel-2); color: var(--muted);
-  border: 1px solid var(--border); border-bottom: none;
-  border-radius: 12px 12px 0 0;
-  font-family: var(--font-body); font-size: 14px; font-weight: 600;
-  padding: 11px 20px; cursor: pointer; position: relative; top: 1px;
-  transition: color 0.15s, background 0.15s;
+  background: none; border: none; border-bottom: 2px solid transparent;
+  color: var(--muted); font-family: var(--font-body); font-size: 14px; font-weight: 600;
+  padding: 14px 12px; cursor: pointer; margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
 }
 .tab:hover { color: var(--text); }
-.tab.active {
-  background: var(--panel); color: var(--accent);
-  border-top: 2px solid var(--accent); padding-top: 10px; z-index: 2;
-}
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-.tabpanel {
-  background: var(--panel); border: 1px solid var(--border);
-  border-radius: 0 18px 18px 18px; padding: 24px;
-  animation: rise 0.4s ease both;
-}
+.tabpanel { padding: 20px; animation: rise 0.4s ease both; }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
 
-/* ---- preview panel ---- */
-.panel {
-  background: var(--panel); border: 1px solid var(--border);
-  border-radius: 18px; padding: 24px; animation: rise 0.5s ease both;
-}
-.preview { animation-delay: 0.08s; }
-.panel h2 {
-  margin: 0 0 18px; font-family: var(--font-display); font-size: 14px;
+/* ---- preview + export headings ---- */
+.preview h2, .export h2 {
+  margin: 0 0 16px; font-family: var(--font-display); font-size: 14px;
   font-weight: 700; letter-spacing: 0.3px; color: var(--muted);
 }
 
@@ -162,8 +184,16 @@ input:disabled { opacity: 0.45; cursor: not-allowed; }
   display: flex; align-items: center; gap: 10px;
   background: var(--panel); border: 1px solid var(--border);
   border-radius: 10px; padding: 8px 10px;
+  transition: opacity 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
-.reorder { display: flex; flex-direction: column; gap: 2px; }
+.stoprow.dragging { opacity: 0.45; border-color: var(--accent); border-style: dashed; }
+.reorder { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.grip {
+  font-size: 13px; line-height: 1; color: var(--muted);
+  cursor: grab; user-select: none; padding: 1px 0 3px;
+}
+.grip:active { cursor: grabbing; }
+.grip:hover { color: var(--accent); }
 .reorder button {
   width: 22px; height: 16px; line-height: 1; font-size: 9px;
   background: var(--panel-2); color: var(--muted); border: 1px solid var(--border);
@@ -199,13 +229,14 @@ input:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* ---- preview stage (checkerboard reveals transparency) ---- */
 .stage {
+  flex: 1;
   background:
     linear-gradient(45deg, var(--check) 25%, transparent 25%) -10px 0 / 20px 20px,
     linear-gradient(-45deg, var(--check) 25%, transparent 25%) -10px 0 / 20px 20px,
     var(--panel-2);
   border: 1px solid var(--border); border-radius: 14px;
-  min-height: 160px; display: flex; align-items: center; justify-content: center;
-  padding: 22px; margin-bottom: 20px;
+  min-height: 220px; display: flex; align-items: center; justify-content: center;
+  padding: 24px;
 }
 .stage img { max-width: 100%; }
 
@@ -230,5 +261,9 @@ input:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 .ghost:hover { color: var(--accent); border-color: var(--accent); }
 
-.hint { font-size: 13px; color: var(--muted); line-height: 1.65; margin: 16px 0 0; }
-.hint code { color: var(--text); background: var(--panel-2); padding: 1px 7px; border-radius: 6px; font-family: var(--font-body); }
+.guide { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--border); }
+.guide h3 { margin: 0 0 12px; font-family: var(--font-display); font-size: 13px; font-weight: 700; color: var(--muted); }
+.guide ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 9px; }
+.guide li { font-size: 13px; color: var(--text); line-height: 1.5; }
+.guide li b { color: var(--accent); font-weight: 700; }
+.guide li code { color: var(--text); background: var(--panel-2); padding: 1px 6px; border-radius: 5px; font-family: var(--font-body); }
