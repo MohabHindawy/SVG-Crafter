@@ -1,24 +1,25 @@
-import { useEffect, useMemo, useState } from "react";
-import { generateSvg, adjustBrightness } from "./generateSvg";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { generateSvg, adjustBrightness, autoSize, normalizeUrl } from "./generateSvg";
 import "./App.css";
 import sunIcon from "../public/LightMode.svg";
 import moonIcon from "../public/DarkMode.svg";
 
 // Real text measurement (needs the DOM, so it stays out of generateSvg).
-function measureTextWidth(text, fontSize, fontWeight) {
+// The font family must match what the SVG renders or the typing reveal drifts.
+function measureTextWidth(text, fontSize, fontWeight, fontFamily) {
   const canvas =
     measureTextWidth._c || (measureTextWidth._c = document.createElement("canvas"));
   const ctx = canvas.getContext("2d");
-  ctx.font = `${fontWeight} ${fontSize}px 'Segoe UI', system-ui, -apple-system, Arial, sans-serif`;
+  ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
   return Math.ceil(ctx.measureText(text || " ").width);
 }
 
 // Cumulative width after each character — needed for the "one letter at a time"
 // typing mode so the reveal lands exactly on each character boundary.
-function measureSentence(text, fontSize, fontWeight) {
+function measureSentence(text, fontSize, fontWeight, fontFamily) {
   const prefixes = [0];
-  for (let k = 1; k <= text.length; k++) prefixes.push(measureTextWidth(text.slice(0, k), fontSize, fontWeight));
-  return { text, width: prefixes[prefixes.length - 1] || measureTextWidth(text, fontSize, fontWeight), prefixes };
+  for (let k = 1; k <= text.length; k++) prefixes.push(measureTextWidth(text.slice(0, k), fontSize, fontWeight, fontFamily));
+  return { text, width: prefixes[prefixes.length - 1] || measureTextWidth(text, fontSize, fontWeight, fontFamily), prefixes };
 }
 
 const TABS = [
@@ -29,6 +30,62 @@ const TABS = [
 ];
 
 const MAX_SENTENCES = 6;
+
+// Default fonts are system-font stacks: they need no embedding and render on the
+// viewer's machine (external web fonts don't load through GitHub's image proxy).
+const FONTS = [
+  { id: "sans", label: "Sans", stack: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" },
+  { id: "serif", label: "Serif", stack: "Georgia, 'Times New Roman', Times, serif" },
+  { id: "mono", label: "Mono", stack: "ui-monospace, 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace" },
+  { id: "rounded", label: "Rounded", stack: "'Trebuchet MS', 'Segoe UI', Verdana, system-ui, sans-serif" },
+  { id: "condensed", label: "Condensed", stack: "'Arial Narrow', 'Helvetica Neue', Arial, sans-serif" },
+];
+const CUSTOM_FAMILY = "SVGCrafterCustom"; // family name used for an imported font
+
+// Resolve the active CSS font-family string from config (used for both
+// in-browser measurement and the generated SVG).
+const familyFor = (config) =>
+  config.embedFont ? `'${CUSTOM_FAMILY}', ${FONTS[0].stack}` : (FONTS.find((f) => f.id === config.fontId) || FONTS[0]).stack;
+
+// format() token for an @font-face src, from the file extension.
+const fontFormat = (name) => {
+  const ext = (name.split(".").pop() || "").toLowerCase();
+  return { woff2: "woff2", woff: "woff", ttf: "truetype", otf: "opentype" }[ext] || "woff2";
+};
+const readAsDataURL = (file) =>
+  new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = () => rej(r.error);
+    r.readAsDataURL(file);
+  });
+
+// Per-sentence text alignment. "justify" stretches multi-word sentences to fill
+// the banner band (single words fall back to left in generateSvg).
+const ALIGNMENTS = [
+  { id: "left", label: "Align left" },
+  { id: "center", label: "Align center" },
+  { id: "right", label: "Align right" },
+  { id: "justify", label: "Justify" },
+];
+
+// Tiny inline icon (three bars) illustrating each alignment.
+function AlignIcon({ type }) {
+  const rows = {
+    left: [[2, 14], [2, 9], [2, 11]],
+    center: [[2, 14], [5, 11], [3, 13]],
+    right: [[2, 14], [7, 14], [5, 14]],
+    justify: [[2, 14], [2, 14], [2, 14]],
+  }[type] || [];
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+      strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+      {rows.map(([x1, x2], i) => (
+        <line key={i} x1={x1} x2={x2} y1={4 + i * 4} y2={4 + i * 4} />
+      ))}
+    </svg>
+  );
+}
 
 // ---- paint factories ------------------------------------------------------
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -235,8 +292,11 @@ export default function App() {
   const [copied, setCopied] = useState("");
   const [config, setConfig] = useState({
     sentences: ["Mohab", "Software Engineer"],
+    sentenceAligns: ["left", "left"],
     fontSize: 40,
     fontWeight: 700,
+    fontId: "sans",
+    embedFont: null,
     animate: true,
     typingMode: "smooth",
     typingSpeed: 1,
@@ -249,6 +309,11 @@ export default function App() {
     borderPaint: gradientPaint("#41d1ff", "#bd34fe", 0),
     bgPaint: solidPaint("#14142b"),
     glow: false,
+    autoWidth: true,
+    bannerWidth: 600,
+    autoHeight: true,
+    bannerHeight: 120,
+    linkUrl: "",
   });
 
   useEffect(() => {
@@ -265,18 +330,75 @@ export default function App() {
   // sentence list helpers
   const setSentence = (i, text) =>
     setConfig((c) => ({ ...c, sentences: c.sentences.map((s, idx) => (idx === i ? text : s)) }));
+  const setSentenceAlign = (i, align) =>
+    setConfig((c) => ({ ...c, sentenceAligns: c.sentenceAligns.map((a, idx) => (idx === i ? align : a)) }));
   const addSentence = () =>
-    setConfig((c) => (c.sentences.length < MAX_SENTENCES ? { ...c, sentences: [...c.sentences, ""] } : c));
+    setConfig((c) =>
+      c.sentences.length < MAX_SENTENCES
+        ? { ...c, sentences: [...c.sentences, ""], sentenceAligns: [...c.sentenceAligns, "left"] }
+        : c
+    );
   const removeSentence = (i) =>
-    setConfig((c) => (c.sentences.length > 1 ? { ...c, sentences: c.sentences.filter((_, idx) => idx !== i) } : c));
+    setConfig((c) =>
+      c.sentences.length > 1
+        ? {
+            ...c,
+            sentences: c.sentences.filter((_, idx) => idx !== i),
+            sentenceAligns: c.sentenceAligns.filter((_, idx) => idx !== i),
+          }
+        : c
+    );
 
-  const svg = useMemo(() => {
-    const sentences = config.sentences.map((t) => measureSentence(t, config.fontSize, config.fontWeight));
-    return generateSvg({ ...config, sentences });
-  }, [config]);
+  // Active font family, measured sentences, and the resulting SVG.
+  const fontFamily = useMemo(
+    () => familyFor(config.fontId, config.embedFont),
+    [config.fontId, config.embedFont]
+  );
+  const measured = useMemo(
+    () =>
+      config.sentences.map((t, i) => ({
+        ...measureSentence(t, config.fontSize, config.fontWeight, fontFamily),
+        align: config.sentenceAligns[i] || "left",
+      })),
+    [config.sentences, config.sentenceAligns, config.fontSize, config.fontWeight, fontFamily]
+  );
+  const auto = useMemo(() => autoSize(measured, config.fontSize), [measured, config.fontSize]);
+  const svg = useMemo(() => generateSvg({ ...config, sentences: measured, fontFamily }), [config, measured, fontFamily]);
+
+  // Import a custom font: load it so canvas measurement is correct, then store
+  // it (base64) so generateSvg can embed it for a self-contained SVG.
+  const fontInputRef = useRef(null);
+  async function importFont(file) {
+    if (!file) return;
+    try {
+      const dataUrl = await readAsDataURL(file);
+      const format = fontFormat(file.name);
+      try {
+        const ff = new FontFace(CUSTOM_FAMILY, `url(${dataUrl})`);
+        await ff.load();
+        document.fonts.add(ff);
+      } catch {
+        /* measurement may be approximate, but the embedded SVG still renders */
+      }
+      setConfig((c) => ({ ...c, embedFont: { family: CUSTOM_FAMILY, dataUrl, format, name: file.name }, fontId: "custom" }));
+    } catch {
+      /* ignore unreadable file */
+    }
+  }
+  const selectFont = (id) => setConfig((c) => ({ ...c, fontId: id, embedFont: null }));
+  const removeFont = () => setConfig((c) => ({ ...c, fontId: "sans", embedFont: null }));
+
+  // Width/height: seed the slider with the live auto value when going custom.
+  const setWidthAuto = (isAuto) =>
+    setConfig((c) => ({ ...c, autoWidth: isAuto, bannerWidth: isAuto ? c.bannerWidth : auto.width }));
+  const setHeightAuto = (isAuto) =>
+    setConfig((c) => ({ ...c, autoHeight: isAuto, bannerHeight: isAuto ? c.bannerHeight : auto.height }));
 
   const dataUri = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-  const markdown = `![${config.sentences[0] || "banner"}](./assets/banner.svg)`;
+  const link = normalizeUrl(config.linkUrl);
+  const alt = config.sentences[0] || "banner";
+  const imageMd = `![${alt}](./assets/banner.svg)`;
+  const markdown = link ? `[${imageMd}](${link})` : imageMd;
 
   async function copy(value, which) {
     await navigator.clipboard.writeText(value);
@@ -335,17 +457,37 @@ export default function App() {
                   <span>Sentences{config.sentences.length > 1 ? " (cycle in order)" : ""}</span>
                   <div className="sentences">
                     {config.sentences.map((s, i) => (
-                      <div className="sentence-row" key={i}>
-                        <input
-                          type="text"
-                          value={s}
-                          onChange={(e) => setSentence(i, e.target.value)}
-                          maxLength={40}
-                          placeholder={`Sentence ${i + 1}`}
-                        />
-                        {config.sentences.length > 1 && (
-                          <button type="button" className="remove" onClick={() => removeSentence(i)} aria-label="Remove sentence">✕</button>
-                        )}
+                      <div className="sentence-item" key={i}>
+                        <div className="sentence-row">
+                          <input
+                            type="text"
+                            value={s}
+                            onChange={(e) => setSentence(i, e.target.value)}
+                            maxLength={40}
+                            placeholder={`Sentence ${i + 1}`}
+                          />
+                          {config.sentences.length > 1 && (
+                            <button type="button" className="remove" onClick={() => removeSentence(i)} aria-label="Remove sentence">✕</button>
+                          )}
+                        </div>
+                        <div className="seg align-seg" role="group" aria-label="Text alignment">
+                          {ALIGNMENTS.map((a) => {
+                            const on = (config.sentenceAligns[i] || "left") === a.id;
+                            return (
+                              <button
+                                key={a.id}
+                                type="button"
+                                className={on ? "on" : ""}
+                                onClick={() => setSentenceAlign(i, a.id)}
+                                title={a.label}
+                                aria-label={a.label}
+                                aria-pressed={on}
+                              >
+                                <AlignIcon type={a.id} />
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -355,6 +497,45 @@ export default function App() {
                 </div>
 
                 <PaintControl label="Text colour" paint={config.textPaint} onChange={setPaint("textPaint")} />
+
+                <div className="field">
+                  <span>Font</span>
+                  <div className="font-grid">
+                    {FONTS.map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        className={"font-chip" + (!config.embedFont && config.fontId === f.id ? " on" : "")}
+                        style={{ fontFamily: f.stack }}
+                        onClick={() => selectFont(f.id)}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    ref={fontInputRef}
+                    type="file"
+                    accept=".woff2,.woff,.ttf,.otf,font/*"
+                    style={{ display: "none" }}
+                    onChange={(e) => {
+                      importFont(e.target.files?.[0]);
+                      e.target.value = "";
+                    }}
+                  />
+                  {config.embedFont ? (
+                    <div className="font-custom">
+                      <span className="font-custom-name" title={config.embedFont.name}>{config.embedFont.name}</span>
+                      <button type="button" className="ghost" onClick={() => fontInputRef.current?.click()}>replace</button>
+                      <button type="button" className="remove" onClick={removeFont} aria-label="Remove custom font">✕</button>
+                    </div>
+                  ) : (
+                    <button type="button" className="add" onClick={() => fontInputRef.current?.click()}>
+                      + Import custom font
+                    </button>
+                  )}
+                </div>
+
                 <label className="field">
                   <span>Font size — {config.fontSize}px</span>
                   <input type="range" min="20" max="72" value={config.fontSize} onChange={set("fontSize")} />
@@ -418,7 +599,37 @@ export default function App() {
             )}
 
             {tab === "background" && (
-              <PaintControl label="Background" paint={config.bgPaint} onChange={setPaint("bgPaint")} />
+              <>
+                <div className="field">
+                  <span>Width</span>
+                  <div className="seg">
+                    <button type="button" className={config.autoWidth ? "on" : ""} onClick={() => setWidthAuto(true)}>Fit text</button>
+                    <button type="button" className={!config.autoWidth ? "on" : ""} onClick={() => setWidthAuto(false)}>Custom</button>
+                  </div>
+                </div>
+                {!config.autoWidth && (
+                  <label className="field">
+                    <span>Banner width — {config.bannerWidth}px</span>
+                    <input type="range" min="200" max="1000" step="10" value={config.bannerWidth} onChange={set("bannerWidth")} />
+                  </label>
+                )}
+
+                <div className="field">
+                  <span>Height</span>
+                  <div className="seg">
+                    <button type="button" className={config.autoHeight ? "on" : ""} onClick={() => setHeightAuto(true)}>Fit text</button>
+                    <button type="button" className={!config.autoHeight ? "on" : ""} onClick={() => setHeightAuto(false)}>Custom</button>
+                  </div>
+                </div>
+                {!config.autoHeight && (
+                  <label className="field">
+                    <span>Banner height — {config.bannerHeight}px</span>
+                    <input type="range" min="60" max="400" step="10" value={config.bannerHeight} onChange={set("bannerHeight")} />
+                  </label>
+                )}
+
+                <PaintControl label="Background" paint={config.bgPaint} onChange={setPaint("bgPaint")} />
+              </>
             )}
 
             {tab === "effects" && (
@@ -443,6 +654,16 @@ export default function App() {
           </div>
 
           <label className="field">
+            <span>Link URL (optional)</span>
+            <input
+              type="text"
+              value={config.linkUrl}
+              onChange={set("linkUrl")}
+              placeholder="github.com/username"
+            />
+          </label>
+
+          <label className="field">
             <span>README snippet</span>
             <div className="snippet">
               <code>{markdown}</code>
@@ -457,6 +678,7 @@ export default function App() {
               <li>Hit <b>Download .svg</b>, or <b>Copy SVG</b> to grab the markup.</li>
               <li>Add the file to an <code>assets</code> folder in your profile repo.</li>
               <li>Paste the snippet above into your <code>README.md</code>.</li>
+              {link && <li>The snippet wraps the image in your link, so clicking the banner on GitHub opens <code>{link}</code>.</li>}
             </ol>
           </div>
         </section>
