@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="276" height="88" viewBox="0 0 276 88" role="img" aria-label="Hello">
+  <a href="https://www.youtube.com/watch?v=BlSXxA1o1-Y" xlink:href="https://www.youtube.com/watch?v=BlSXxA1o1-Y" target="_blank" rel="noopener">
+    <style>
+    .cursor { animation: blink 1s steps(1) infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+  </style>
+  <defs>
+    <linearGradient id="textPaint" x1="0" y1="0.5" x2="1" y2="0.5">
+      <stop offset="0%" stop-color="#41d1ff" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#bd34fe" stop-opacity="1"/>
+    </linearGradient>
+    <clipPath id="clip0">
+      <rect x="28" y="0" width="0" height="88">
+        <animate attributeName="width" values="0;100;100;0;0" keyTimes="0;0.104839;0.346774;0.403226;1" dur="6.2s" calcMode="linear" repeatCount="indefinite"/>
+      </rect>
+    </clipPath>
+    <clipPath id="clip1">
+      <rect x="28" y="0" width="0" height="88">
+        <animate attributeName="width" values="0;0;220;220;0" keyTimes="0;0.403226;0.633871;0.875806;1" dur="6.2s" calcMode="linear" repeatCount="indefinite"/>
+      </rect>
+    </clipPath>
+  </defs>
+  <rect x="0" y="0" width="276" height="88" rx="14" fill="#14142b" fill-opacity="1"/>
+  <text x="28" y="58" fill="url(#textPaint)" fill-opacity="1" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="40" font-weight="700" clip-path="url(#clip0)">Hello</text>
+  <text x="28" y="58" fill="url(#textPaint)" fill-opacity="1" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="40" font-weight="700" clip-path="url(#clip1)">SVG Crafter</text>
+  <rect class="cursor" x="28" y="24" width="3" height="40" fill="#41d1ff" fill-opacity="1">
+    <animate attributeName="x" values="28;128;128;28;248;248;28" keyTimes="0;0.104839;0.346774;0.403226;0.633871;0.875806;1" dur="6.2s" calcMode="linear" repeatCount="indefinite"/>
+  </rect>
+  </a>
+</svg>
