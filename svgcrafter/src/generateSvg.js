@@ -176,6 +176,64 @@ function toAnim(points, T, valueFn = (w) => w) {
   return { keyTimes: keyTimes.join(";"), values: values.join(";") };
 }
 
+// --- crossfade-style transitions (CSS @keyframes) --------------------------
+// Sentences cycle on one shared loop. Each is shown for `hold`, then over
+// `trans` the current sentence animates "out" while the next animates "in"
+// (their windows overlap = crossfade). Built as per-sentence CSS @keyframes so
+// it runs inside GitHub's proxied <img> (declarative, no JS) like the cursor.
+function transitionStates(kind, width, fontSize) {
+  const dx = round(width * 0.32, 1);
+  const dy = round(fontSize * 0.9, 1);
+  switch (kind) {
+    case "zoom":
+      return { enter: "opacity:0;transform:scale(0.82)", vis: "opacity:1;transform:scale(1)", exit: "opacity:0;transform:scale(0.82)" };
+    case "slide":
+      return { enter: `opacity:0;transform:translateX(${dx}px)`, vis: "opacity:1;transform:translateX(0)", exit: `opacity:0;transform:translateX(${-dx}px)` };
+    case "rise":
+      return { enter: `opacity:0;transform:translateY(${dy}px)`, vis: "opacity:1;transform:translateY(0)", exit: `opacity:0;transform:translateY(${-dy}px)` };
+    case "blur":
+      return { enter: "opacity:0;filter:blur(6px)", vis: "opacity:1;filter:blur(0)", exit: "opacity:0;filter:blur(6px)" };
+    case "fade":
+    default:
+      return { enter: "opacity:0", vis: "opacity:1", exit: "opacity:0" };
+  }
+}
+
+function buildTransitionCss(count, kind, hold, trans, width, fontSize) {
+  const st = transitionStates(kind, width, fontSize);
+  const S = hold + trans;
+  const T = S * count;
+  const pct = (t) => clamp(round((t / T) * 100, 3), 0, 100);
+  const rules = [];
+  for (let i = 0; i < count; i++) {
+    const start = i * S;
+    const tEnterEnd = start + trans;
+    const tHoldEnd = start + S;
+    const tExitEnd = tHoldEnd + trans;
+    let frames;
+    if (tExitEnd <= T + 1e-6) {
+      frames = [
+        [0, st.enter], [pct(start), st.enter], [pct(tEnterEnd), st.vis],
+        [pct(tHoldEnd), st.vis], [pct(tExitEnd), st.exit], [100, st.enter],
+      ];
+    } else {
+      // last sentence: its "out" wraps into the start of the loop
+      frames = [
+        [0, st.vis], [pct(tExitEnd - T), st.exit],
+        [pct(start), st.enter], [pct(tEnterEnd), st.vis], [100, st.vis],
+      ];
+    }
+    frames.sort((a, b) => a[0] - b[0]);
+    const seen = new Map();             // dedupe coincident percents (last wins)
+    for (const [p, decl] of frames) seen.set(p, decl);
+    const stops = [...seen.entries()].map(([p, decl]) => `${p}% { ${decl} }`).join(" ");
+    rules.push(`@keyframes tkf${i} { ${stops} }`);
+  }
+  const anims = Array.from({ length: count }, (_, i) => `.tt${i} { animation: tkf${i} ${round(T, 2)}s ease-in-out infinite; }`).join(" ");
+  const css = `.tt { transform-box: fill-box; transform-origin: center; }\n    ${rules.join("\n    ")}\n    ${anims}`;
+  return { css, dur: T };
+}
+
 export function generateSvg(config) {
   const {
     sentences = [{ text: "Your Name", width: 220, prefixes: [] }],
@@ -183,7 +241,8 @@ export function generateSvg(config) {
     fontWeight = 700,
     fontFamily = FONT_STACK,
     embedFont = null,        // { family, dataUrl, format } -> embedded @font-face
-    animate = true,
+    transition = "typing",   // none | typing | fade | zoom | slide | rise | blur
+    transitionDuration = 0.6, // seconds, for the crossfade-style transitions
     typingMode = "smooth",
     typingSpeed = 1,
     cursor = true,
@@ -266,19 +325,57 @@ export function generateSvg(config) {
     `font-family="${fontFamily}" font-size="${fontSize}" font-weight="${fontWeight}"` +
     (glow ? ` filter="url(#glow)"` : "");
 
-  // A custom imported font is embedded as base64 so the SVG renders identically
-  // everywhere (GitHub's proxy won't fetch external fonts).
-  const fontFaceCss =
-    embedFont && embedFont.dataUrl
-      ? `@font-face { font-family: '${embedFont.family}'; src: url('${embedFont.dataUrl}') format('${embedFont.format || "woff2"}'); font-weight: 100 900; font-style: normal; font-display: block; }`
-      : "";
+  // A fetched font is embedded (base64) so the SVG renders identically
+  // everywhere (GitHub's proxy won't fetch external fonts). embedFont.css is the
+  // ready-to-inline @font-face rule built by the app.
+  const fontFaceCss = embedFont && embedFont.css ? embedFont.css : "";
   const styleBlock = (parts) => {
     const body = parts.filter(Boolean).join("\n    ");
     return body ? `<style>\n    ${body}\n  </style>` : "";
   };
 
-  // --- static ----------------------------------------------------------------
-  if (!animate) {
+  const liveCount = list.length;
+
+  // ---- typing transition (SMIL clip engine) --------------------------------
+  if (transition === "typing") {
+    const mode = typingMode === "char" ? "char" : "smooth";
+    const calcMode = mode === "char" ? "discrete" : "linear";
+    const { T, perSentence, cursorPts } = buildTimeline(geo, mode, holdDuration, Math.max(0.1, Number(typingSpeed) || 1));
+
+    const texts = [];
+    geo.forEach((s, i) => {
+      const a = toAnim(perSentence[i], T);
+      defs.push(`<clipPath id="clip${i}">
+      <rect x="${s.startX}" y="0" width="0" height="${height}">
+        <animate attributeName="width" values="${a.values}" keyTimes="${a.keyTimes}" dur="${round(T, 2)}s" calcMode="${calcMode}" repeatCount="indefinite"/>
+      </rect>
+    </clipPath>`);
+      texts.push(`<text x="${s.startX}" y="${baseline}" ${textAttrs}${justifyAttr(s)} clip-path="url(#clip${i})">${escapeXml(s.text)}</text>`);
+    });
+
+    let cursorEl = "";
+    let cursorCss = "";
+    if (cursor) {
+      const ca = toAnim(cursorPts, T); // points are already absolute x
+      cursorCss = `.cursor { animation: blink 1s steps(1) infinite; }
+    @keyframes blink { 50% { opacity: 0; } }`;
+      cursorEl = `<rect class="cursor" x="${geo[0].startX}" y="${cursorY}" width="3" height="${fontSize}" fill="${main.color}" fill-opacity="${main.opacity}">
+    <animate attributeName="x" values="${ca.values}" keyTimes="${ca.keyTimes}" dur="${round(T, 2)}s" calcMode="${calcMode}" repeatCount="indefinite"/>
+  </rect>`;
+    }
+
+    const inner = [
+      styleBlock([fontFaceCss, cursorCss]),
+      `<defs>\n    ${defs.join("\n    ")}\n  </defs>`,
+      bgRect,
+      ...texts,
+      cursorEl,
+    ].filter(Boolean).join("\n  ");
+    return wrap(width, height, geo[0].text, inner, linkUrl);
+  }
+
+  // ---- single sentence, non-typing: nothing to cycle, render it static -----
+  if (liveCount <= 1) {
     const g0 = geo[0];
     const inner = [
       styleBlock([fontFaceCss]),
@@ -289,47 +386,32 @@ export function generateSvg(config) {
     return wrap(width, height, g0.text, inner, linkUrl);
   }
 
-  // --- animated --------------------------------------------------------------
-  const mode = typingMode === "char" ? "char" : "smooth";
-  const calcMode = mode === "char" ? "discrete" : "linear";
-  const { T, perSentence, cursorPts } = buildTimeline(geo, mode, holdDuration, Math.max(0.1, Number(typingSpeed) || 1));
-
-  const texts = [];
-  geo.forEach((s, i) => {
-    const a = toAnim(perSentence[i], T);
-    defs.push(`<clipPath id="clip${i}">
-      <rect x="${s.startX}" y="0" width="0" height="${height}">
-        <animate attributeName="width" values="${a.values}" keyTimes="${a.keyTimes}" dur="${round(T, 2)}s" calcMode="${calcMode}" repeatCount="indefinite"/>
-      </rect>
-    </clipPath>`);
-    texts.push(`<text x="${s.startX}" y="${baseline}" ${textAttrs}${justifyAttr(s)} clip-path="url(#clip${i})">${escapeXml(s.text)}</text>`);
-  });
-
-  let cursorEl = "";
-  let cursorCss = "";
-  if (cursor) {
-    const ca = toAnim(cursorPts, T); // points are already absolute x
-    cursorCss = `.cursor { animation: blink 1s steps(1) infinite; }
-    @keyframes blink { 50% { opacity: 0; } }`;
-    cursorEl = `<rect class="cursor" x="${geo[0].startX}" y="${cursorY}" width="3" height="${fontSize}" fill="${main.color}" fill-opacity="${main.opacity}">
-    <animate attributeName="x" values="${ca.values}" keyTimes="${ca.keyTimes}" dur="${round(T, 2)}s" calcMode="${calcMode}" repeatCount="indefinite"/>
-  </rect>`;
-  }
-
+  // ---- crossfade-style transitions (CSS keyframes) -------------------------
+  // "none" is a near-instant cut (a tiny, non-zero duration keeps the keyframe
+  // stops distinct so the held state doesn't interpolate into a slow fade).
+  const trans = transition === "none" ? 0.05 : clamp(Number(transitionDuration) || 0.6, 0.05, 3);
+  const { css: transCss } = buildTransitionCss(liveCount, transition, Math.max(0.1, Number(holdDuration) || 1.5), trans, width, fontSize);
+  const transTexts = geo.map(
+    (s, i) => `<text class="tt tt${i}" x="${s.startX}" y="${baseline}" ${textAttrs}${justifyAttr(s)}>${escapeXml(s.text)}</text>`
+  );
   const inner = [
-    styleBlock([fontFaceCss, cursorCss]),
-    `<defs>\n    ${defs.join("\n    ")}\n  </defs>`,
+    styleBlock([fontFaceCss, transCss]),
+    defs.length ? `<defs>\n    ${defs.join("\n    ")}\n  </defs>` : "",
     bgRect,
-    ...texts,
-    cursorEl,
+    ...transTexts,
   ].filter(Boolean).join("\n  ");
-
   return wrap(width, height, geo[0].text, inner, linkUrl);
 }
 
-function wrap(width, height, label, inner) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(label)}">
-  ${inner}
+function wrap(width, height, label, inner, linkUrl = "") {
+  const link = normalizeUrl(linkUrl);
+  const body = link
+    ? `<a href="${escapeXml(link)}" xlink:href="${escapeXml(link)}" target="_blank" rel="noopener">
+    ${inner}
+  </a>`
+    : inner;
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(label)}">
+  ${body}
 </svg>`;
 }
 

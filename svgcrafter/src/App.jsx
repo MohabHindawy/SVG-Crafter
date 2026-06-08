@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { generateSvg, adjustBrightness, autoSize, normalizeUrl } from "./generateSvg";
 import "./App.css";
 import sunIcon from "../public/LightMode.svg";
@@ -40,25 +40,83 @@ const FONTS = [
   { id: "rounded", label: "Rounded", stack: "'Trebuchet MS', 'Segoe UI', Verdana, system-ui, sans-serif" },
   { id: "condensed", label: "Condensed", stack: "'Arial Narrow', 'Helvetica Neue', Arial, sans-serif" },
 ];
-const CUSTOM_FAMILY = "SVGCrafterCustom"; // family name used for an imported font
 
-// Resolve the active CSS font-family string from config (used for both
-// in-browser measurement and the generated SVG).
-const familyFor = (config) =>
-  config.embedFont ? `'${CUSTOM_FAMILY}', ${FONTS[0].stack}` : (FONTS.find((f) => f.id === config.fontId) || FONTS[0]).stack;
+// A few popular Google Fonts to pick from (any other name can be typed in too).
+const GOOGLE_FONTS = [
+  "Inter", "Poppins", "Montserrat", "Roboto Slab", "Playfair Display",
+  "Lobster", "Pacifico", "Bebas Neue", "Caveat", "Fira Code",
+];
 
-// format() token for an @font-face src, from the file extension.
-const fontFormat = (name) => {
-  const ext = (name.split(".").pop() || "").toLowerCase();
-  return { woff2: "woff2", woff: "woff", ttf: "truetype", otf: "opentype" }[ext] || "woff2";
-};
-const readAsDataURL = (file) =>
-  new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(r.result);
-    r.onerror = () => rej(r.error);
-    r.readAsDataURL(file);
-  });
+// Resolve the active CSS font-family string (used for both in-browser
+// measurement and the generated SVG). A fetched Google font is rendered under
+// its real family name with a system fallback.
+const familyFor = (fontId, embedFont) =>
+  embedFont ? `'${embedFont.family}', ${FONTS[0].stack}` : (FONTS.find((f) => f.id === fontId) || FONTS[0]).stack;
+
+// --- Google Fonts: fetch + base64-embed (so the SVG stays self-contained) ----
+function bufferToBase64(buf) {
+  const bytes = new Uint8Array(buf);
+  let bin = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  return btoa(bin);
+}
+
+// From a Google Fonts CSS2 response, pick the basic-latin woff2 face.
+function pickLatinFace(css) {
+  const re = /\/\*\s*([\w-]+)\s*\*\/\s*@font-face\s*{([^}]*)}/g;
+  const found = [];
+  let m;
+  while ((m = re.exec(css))) {
+    const body = m[2];
+    const url = (body.match(/url\((https:\/\/[^)]+\.woff2)\)/) || [])[1];
+    if (!url) continue;
+    found.push({
+      label: m[1],
+      url,
+      // eslint-disable-next-line no-sparse-arrays
+      weight: (body.match(/font-weight:\s*([^;]+);/) || [, "400"])[1].trim(),
+      // eslint-disable-next-line no-sparse-arrays
+      style: (body.match(/font-style:\s*([^;]+);/) || [, "normal"])[1].trim(),
+    });
+  }
+  if (found.length) return found.find((f) => f.label === "latin") || found[0];
+  const url = (css.match(/url\((https:\/\/[^)]+\.woff2)\)/) || [])[1];
+  return url ? { url, weight: "400", style: "normal" } : null;
+}
+
+// Fetch a Google font by family name, embed it, and load it for measurement.
+// Returns { family, css } where css is the ready-to-inline @font-face rule.
+async function loadGoogleFont(family) {
+  const res = await fetch(`https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}&display=swap`);
+  if (!res.ok) throw new Error(`Couldn't find "${family}" on Google Fonts.`);
+  const face = pickLatinFace(await res.text());
+  if (!face) throw new Error("That font has no usable web file.");
+  const fontRes = await fetch(face.url);
+  if (!fontRes.ok) throw new Error("Couldn't download the font file.");
+  const dataUrl = `data:font/woff2;base64,${bufferToBase64(await fontRes.arrayBuffer())}`;
+  const css = `@font-face { font-family: '${family}'; font-style: ${face.style}; font-weight: ${face.weight}; font-display: block; src: url('${dataUrl}') format('woff2'); }`;
+  try {
+    const ff = new FontFace(family, `url(${dataUrl})`);
+    await ff.load();
+    document.fonts.add(ff);
+  } catch {
+    /* measurement may be approximate, but the embedded SVG still renders */
+  }
+  return { family, css };
+}
+
+// Sentence-switch transitions. "typing" is the typewriter; the rest are CSS
+// crossfade styles. "none" is an instant cut.
+const TRANSITIONS = [
+  { id: "none", label: "None" },
+  { id: "typing", label: "Typing" },
+  { id: "fade", label: "Fade" },
+  { id: "zoom", label: "Zoom" },
+  { id: "slide", label: "Slide" },
+  { id: "rise", label: "Rise" },
+  { id: "blur", label: "Blur" },
+];
 
 // Per-sentence text alignment. "justify" stretches multi-word sentences to fill
 // the banner band (single words fall back to left in generateSvg).
@@ -291,13 +349,15 @@ export default function App() {
   const [tab, setTab] = useState("text");
   const [copied, setCopied] = useState("");
   const [config, setConfig] = useState({
-    sentences: ["Hello", "SVG Crafter"],
+    sentences: ["Welcome 👋", "SVG Crafter"],
     sentenceAligns: ["left", "left"],
     fontSize: 40,
     fontWeight: 700,
     fontId: "sans",
+    googleFont: "",
     embedFont: null,
-    animate: true,
+    transition: "typing",
+    transitionDuration: 0.6,
     typingMode: "smooth",
     typingSpeed: 1,
     cursor: true,
@@ -350,10 +410,7 @@ export default function App() {
     );
 
   // Active font family, measured sentences, and the resulting SVG.
-  const fontFamily = useMemo(
-    () => familyFor(config.fontId, config.embedFont),
-    [config.fontId, config.embedFont]
-  );
+  const fontFamily = useMemo(() => familyFor(config.fontId, config.embedFont), [config.fontId, config.embedFont]);
   const measured = useMemo(
     () =>
       config.sentences.map((t, i) => ({
@@ -365,28 +422,43 @@ export default function App() {
   const auto = useMemo(() => autoSize(measured, config.fontSize), [measured, config.fontSize]);
   const svg = useMemo(() => generateSvg({ ...config, sentences: measured, fontFamily }), [config, measured, fontFamily]);
 
-  // Import a custom font: load it so canvas measurement is correct, then store
-  // it (base64) so generateSvg can embed it for a self-contained SVG.
-  const fontInputRef = useRef(null);
-  async function importFont(file) {
-    if (!file) return;
-    try {
-      const dataUrl = await readAsDataURL(file);
-      const format = fontFormat(file.name);
-      try {
-        const ff = new FontFace(CUSTOM_FAMILY, `url(${dataUrl})`);
-        await ff.load();
-        document.fonts.add(ff);
-      } catch {
-        /* measurement may be approximate, but the embedded SVG still renders */
-      }
-      setConfig((c) => ({ ...c, embedFont: { family: CUSTOM_FAMILY, dataUrl, format, name: file.name }, fontId: "custom" }));
-    } catch {
-      /* ignore unreadable file */
-    }
-  }
-  const selectFont = (id) => setConfig((c) => ({ ...c, fontId: id, embedFont: null }));
-  const removeFont = () => setConfig((c) => ({ ...c, fontId: "sans", embedFont: null }));
+  // Fetch + embed a Google font whenever the chosen family changes. Status is
+  // set in the handler (loading) and in the async then/catch (ready/error) — no
+  // synchronous setState inside the effect body.
+  const [fontStatus, setFontStatus] = useState({ state: "idle", msg: "" });
+  const [fontQuery, setFontQuery] = useState("");
+  useEffect(() => {
+    const fam = config.googleFont;
+    if (!fam) return;
+    let cancelled = false;
+    loadGoogleFont(fam)
+      .then((embed) => {
+        if (cancelled) return;
+        setConfig((c) => (c.googleFont === fam ? { ...c, embedFont: embed } : c));
+        setFontStatus({ state: "ready", msg: "" });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setFontStatus({ state: "error", msg: err.message || "Couldn't load that font." });
+        setConfig((c) => (c.googleFont === fam ? { ...c, googleFont: "", embedFont: null, fontId: "sans" } : c));
+      });
+    return () => { cancelled = true; };
+  }, [config.googleFont]);
+
+  const selectFont = (id) => {
+    setFontStatus({ state: "idle", msg: "" });
+    setConfig((c) => ({ ...c, fontId: id, googleFont: "", embedFont: null }));
+  };
+  const selectGoogleFont = (family) => {
+    const fam = family.trim();
+    if (!fam) return;
+    setFontStatus({ state: "loading", msg: `Loading ${fam}…` });
+    setConfig((c) => ({ ...c, googleFont: fam, fontId: "custom" }));
+  };
+  const removeFont = () => {
+    setFontStatus({ state: "idle", msg: "" });
+    setConfig((c) => ({ ...c, fontId: "sans", googleFont: "", embedFont: null }));
+  };
 
   // Width/height: seed the slider with the live auto value when going custom.
   const setWidthAuto = (isAuto) =>
@@ -505,34 +577,41 @@ export default function App() {
                       <button
                         key={f.id}
                         type="button"
-                        className={"font-chip" + (!config.embedFont && config.fontId === f.id ? " on" : "")}
+                        className={"font-chip" + (!config.embedFont && !config.googleFont && config.fontId === f.id ? " on" : "")}
                         style={{ fontFamily: f.stack }}
                         onClick={() => selectFont(f.id)}
                       >
                         {f.label}
                       </button>
                     ))}
+                    {GOOGLE_FONTS.map((name) => (
+                      <button
+                        key={name}
+                        type="button"
+                        className={"font-chip" + (config.googleFont === name ? " on" : "")}
+                        style={config.embedFont && config.embedFont.family === name ? { fontFamily: `'${name}'` } : undefined}
+                        onClick={() => selectGoogleFont(name)}
+                      >
+                        {name}
+                      </button>
+                    ))}
                   </div>
-                  <input
-                    ref={fontInputRef}
-                    type="file"
-                    accept=".woff2,.woff,.ttf,.otf,font/*"
-                    style={{ display: "none" }}
-                    onChange={(e) => {
-                      importFont(e.target.files?.[0]);
-                      e.target.value = "";
-                    }}
-                  />
-                  {config.embedFont ? (
-                    <div className="font-custom">
-                      <span className="font-custom-name" title={config.embedFont.name}>{config.embedFont.name}</span>
-                      <button type="button" className="ghost" onClick={() => fontInputRef.current?.click()}>replace</button>
-                      <button type="button" className="remove" onClick={removeFont} aria-label="Remove custom font">✕</button>
-                    </div>
-                  ) : (
-                    <button type="button" className="add" onClick={() => fontInputRef.current?.click()}>
-                      + Import custom font
-                    </button>
+                  <div className="font-load">
+                    <input
+                      type="text"
+                      placeholder="Type any Font name"
+                      value={fontQuery}
+                      onChange={(e) => setFontQuery(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") selectGoogleFont(fontQuery); }}
+                    />
+                    <button type="button" className="ghost" onClick={() => selectGoogleFont(fontQuery)}>Load</button>
+                  </div>
+                  {fontStatus.state === "loading" && <p className="font-note">{fontStatus.msg}</p>}
+                  {fontStatus.state === "error" && <p className="font-note error">{fontStatus.msg}</p>}
+                  {config.embedFont && fontStatus.state !== "loading" && (
+                    <p className="font-note">
+                      Using <b>{config.embedFont.family}</b> · <button type="button" className="linkish" onClick={removeFont}>remove</button>
+                    </p>
                   )}
                 </div>
 
@@ -549,12 +628,37 @@ export default function App() {
                   <span>Text glow</span>
                 </label>
 
-                <label className="toggle">
-                  <input type="checkbox" checked={config.animate} onChange={set("animate")} />
-                  <span>Typing animation</span>
-                </label>
+                <div className="field">
+                  <span>Transition{config.sentences.length > 1 ? "" : " (single sentence — needs 2+ to cycle)"}</span>
+                  <div className="font-grid">
+                    {TRANSITIONS.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        className={"font-chip" + (config.transition === t.id ? " on" : "")}
+                        onClick={() => setConfig((c) => ({ ...c, transition: t.id }))}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-                {config.animate && (
+                {(config.sentences.length > 1 || config.transition === "typing") && (
+                  <label className="field">
+                    <span>Hold time — {config.holdDuration}s</span>
+                    <input type="range" min="0.5" max="5" step="0.5" value={config.holdDuration} onChange={set("holdDuration")} />
+                  </label>
+                )}
+
+                {config.transition !== "none" && config.transition !== "typing" && config.sentences.length > 1 && (
+                  <label className="field">
+                    <span>Transition speed — {config.transitionDuration}s</span>
+                    <input type="range" min="0.2" max="1.5" step="0.1" value={config.transitionDuration} onChange={set("transitionDuration")} />
+                  </label>
+                )}
+
+                {config.transition === "typing" && (
                   <div className="subgroup">
                     <div className="field">
                       <span>Typing style</span>
@@ -570,10 +674,6 @@ export default function App() {
                     <label className="field">
                       <span>Typing speed — {config.typingSpeed}x</span>
                       <input type="range" min="0.5" max="4" step="0.5" value={config.typingSpeed} onChange={set("typingSpeed")} />
-                    </label>
-                    <label className="field">
-                      <span>Time between sentences — {config.holdDuration}s</span>
-                      <input type="range" min="0.5" max="5" step="0.5" value={config.holdDuration} onChange={set("holdDuration")} />
                     </label>
                   </div>
                 )}
