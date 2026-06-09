@@ -41,10 +41,37 @@ const FONTS = [
   { id: "condensed", label: "Condensed", stack: "'Arial Narrow', 'Helvetica Neue', Arial, sans-serif" },
 ];
 
-// A few popular Google Fonts to pick from (any other name can be typed in too).
+// A few popular Google Fonts shown as quick-pick chips.
 const GOOGLE_FONTS = [
   "Inter", "Poppins", "Montserrat", "Roboto Slab", "Playfair Display",
   "Lobster", "Pacifico", "Bebas Neue", "Caveat", "Fira Code",
+];
+
+// A larger catalogue of popular Google Fonts, used only to suggest names as the
+// user types. Any name can still be loaded even if it's not in this list.
+const FONT_LIBRARY = [
+  "Abril Fatface", "Albert Sans", "Alegreya", "Alegreya Sans", "Amatic SC", "Anton",
+  "Archivo", "Archivo Black", "Arvo", "Assistant", "Audiowide", "Baloo 2", "Barlow",
+  "Barlow Condensed", "Bebas Neue", "Be Vietnam Pro", "Bitter", "Bodoni Moda",
+  "Bricolage Grotesque", "Bungee", "Cabin", "Caveat", "Catamaran", "Chivo", "Cinzel",
+  "Comfortaa", "Cormorant", "Cormorant Garamond", "Crimson Text", "Dancing Script",
+  "DM Mono", "DM Sans", "DM Serif Display", "Domine", "EB Garamond", "Epilogue", "Exo",
+  "Exo 2", "Figtree", "Fira Code", "Fira Mono", "Fira Sans", "Frank Ruhl Libre",
+  "Fredoka", "Gabarito", "Great Vibes", "Hanken Grotesk", "Heebo", "Hind",
+  "IBM Plex Mono", "IBM Plex Sans", "IBM Plex Serif", "Inconsolata", "Indie Flower",
+  "Inter", "Instrument Sans", "Italiana", "JetBrains Mono", "Josefin Sans", "Jost",
+  "Kanit", "Karla", "Lato", "Lexend", "Libre Baskerville", "Libre Franklin", "Lobster",
+  "Lora", "Manrope", "Marcellus", "Merriweather", "Monoton", "Montserrat", "Mukta",
+  "Mulish", "Noto Sans", "Noto Serif", "Nunito", "Nunito Sans", "Onest", "Open Sans",
+  "Orbitron", "Oswald", "Outfit", "Overpass", "Pacifico", "Pathway Gothic One",
+  "Permanent Marker", "Philosopher", "Playfair Display", "Plus Jakarta Sans", "Poppins",
+  "Prata", "Press Start 2P", "PT Sans", "PT Serif", "Quicksand", "Raleway",
+  "Red Hat Display", "Red Hat Text", "Righteous", "Roboto", "Roboto Condensed",
+  "Roboto Mono", "Roboto Slab", "Rubik", "Sacramento", "Saira", "Saira Condensed",
+  "Satisfy", "Schibsted Grotesk", "Sen", "Shadows Into Light", "Sora", "Source Code Pro",
+  "Source Sans 3", "Source Serif 4", "Space Grotesk", "Space Mono", "Spectral", "Syne",
+  "Teko", "Titillium Web", "Tinos", "Ubuntu", "Ubuntu Mono", "Unbounded", "Urbanist",
+  "Varela Round", "Vollkorn", "Work Sans", "Yeseva One", "Zilla Slab",
 ];
 
 // Resolve the active CSS font-family string (used for both in-browser
@@ -104,6 +131,21 @@ async function loadGoogleFont(family) {
     /* measurement may be approximate, but the embedded SVG still renders */
   }
   return { family, css };
+}
+
+// Bold the matched portion of a suggestion (case-insensitive), Word-style.
+function highlightMatch(name, query) {
+  const q = query.trim();
+  if (!q) return name;
+  const idx = name.toLowerCase().indexOf(q.toLowerCase());
+  if (idx === -1) return name;
+  return (
+    <>
+      {name.slice(0, idx)}
+      <b>{name.slice(idx, idx + q.length)}</b>
+      {name.slice(idx + q.length)}
+    </>
+  );
 }
 
 // Sentence-switch transitions. "typing" is the typewriter; the rest are CSS
@@ -460,6 +502,39 @@ export default function App() {
     setConfig((c) => ({ ...c, fontId: "sans", googleFont: "", embedFont: null }));
   };
 
+  // Font search autocomplete (case-insensitive; prefix matches first).
+  const [showSuggest, setShowSuggest] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(-1);
+  const suggestions = useMemo(() => {
+    const q = fontQuery.trim().toLowerCase();
+    if (!q) return [];
+    const starts = [];
+    const contains = [];
+    for (const name of FONT_LIBRARY) {
+      const ln = name.toLowerCase();
+      if (ln.startsWith(q)) starts.push(name);
+      else if (ln.includes(q)) contains.push(name);
+    }
+    return [...starts, ...contains].slice(0, 8);
+  }, [fontQuery]);
+  const chooseFont = (name) => {
+    setFontQuery(name);
+    setShowSuggest(false);
+    setActiveIdx(-1);
+    selectGoogleFont(name);
+  };
+  const onFontKeyDown = (e) => {
+    if (showSuggest && suggestions.length) {
+      if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx((i) => (i + 1) % suggestions.length); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); setActiveIdx((i) => (i <= 0 ? suggestions.length - 1 : i - 1)); return; }
+      if (e.key === "Escape") { setShowSuggest(false); setActiveIdx(-1); return; }
+      if (e.key === "Enter") { e.preventDefault(); chooseFont(activeIdx >= 0 ? suggestions[activeIdx] : suggestions[0]); return; }
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (fontQuery.trim()) chooseFont(fontQuery.trim());
+    }
+  };
+
   // Width/height: seed the slider with the live auto value when going custom.
   const setWidthAuto = (isAuto) =>
     setConfig((c) => ({ ...c, autoWidth: isAuto, bannerWidth: isAuto ? c.bannerWidth : auto.width }));
@@ -596,15 +671,39 @@ export default function App() {
                       </button>
                     ))}
                   </div>
-                  <div className="font-load">
-                    <input
-                      type="text"
-                      placeholder="Type any Font name"
-                      value={fontQuery}
-                      onChange={(e) => setFontQuery(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") selectGoogleFont(fontQuery); }}
-                    />
-                    <button type="button" className="ghost" onClick={() => selectGoogleFont(fontQuery)}>Load</button>
+                  <div className="font-search">
+                    <div className="font-load">
+                      <input
+                        type="text"
+                        placeholder="Type any Font name"
+                        value={fontQuery}
+                        autoComplete="off"
+                        role="combobox"
+                        aria-expanded={showSuggest && suggestions.length > 0}
+                        aria-autocomplete="list"
+                        onChange={(e) => { setFontQuery(e.target.value); setShowSuggest(true); setActiveIdx(-1); }}
+                        onFocus={() => setShowSuggest(true)}
+                        onBlur={() => setTimeout(() => setShowSuggest(false), 120)}
+                        onKeyDown={onFontKeyDown}
+                      />
+                      <button type="button" className="ghost" onClick={() => fontQuery.trim() && chooseFont(fontQuery.trim())}>Load</button>
+                    </div>
+                    {showSuggest && suggestions.length > 0 && (
+                      <ul className="suggest" role="listbox">
+                        {suggestions.map((name, i) => (
+                          <li
+                            key={name}
+                            role="option"
+                            aria-selected={i === activeIdx}
+                            className={"suggest-item" + (i === activeIdx ? " active" : "")}
+                            onMouseDown={(e) => { e.preventDefault(); chooseFont(name); }}
+                            onMouseEnter={() => setActiveIdx(i)}
+                          >
+                            {highlightMatch(name, fontQuery)}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                   {fontStatus.state === "loading" && <p className="font-note">{fontStatus.msg}</p>}
                   {fontStatus.state === "error" && <p className="font-note error">{fontStatus.msg}</p>}
