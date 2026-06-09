@@ -185,6 +185,24 @@ input:disabled { opacity: 0.45; cursor: not-allowed; }
 .font-load input[type="text"] { flex: 1; }
 .font-load .ghost { flex: none; padding: 0 16px; }
 
+/* ---- font search autocomplete ---- */
+.font-search { position: relative; }
+.suggest {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 6;
+  margin: 0; padding: 4px; list-style: none;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  max-height: 240px; overflow-y: auto;
+}
+.suggest-item {
+  padding: 9px 11px; border-radius: 7px; cursor: pointer;
+  font-size: 14px; color: var(--text); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.suggest-item b { color: var(--accent); font-weight: 700; }
+.suggest-item.active { background: var(--check); }
+.suggest-item.active b { color: var(--accent); }
+
 .font-note { margin: 10px 0 0; font-size: 12px; font-weight: 600; color: var(--muted); }
 .font-note b { color: var(--text); font-weight: 700; }
 .font-note.error { color: #ff6b7d; }
