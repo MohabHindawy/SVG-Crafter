@@ -65,12 +65,19 @@ function gradientAnim(paint, c) {
       el: `\n      <animateTransform attributeName="gradientTransform" type="rotate" from="${from}" to="${to}" dur="${dur}s" repeatCount="indefinite"/>`,
     };
   }
-  // move: translate by one full period along the gradient vector (seamless w/ repeat)
-  const dur = round(18 / speed, 2);
-  let dx = round(c.x2 - c.x1, 4), dy = round(c.y2 - c.y1, 4);
+  // move: slide along the gradient axis. Tile with "reflect" (mirrored) rather
+  // than "repeat" so the pattern has NO hard seam — repeat butts the last stop
+  // straight against the first (a harsh contrast edge that sweeps across the
+  // banner), whereas reflect mirrors at every boundary (last-meets-last,
+  // first-meets-first). Because reflect doubles the spatial period, translate
+  // by one *full* reflect period (2x the gradient vector) to keep the loop
+  // perfectly seamless, and double the base duration so each colour sweep keeps
+  // the same pace it had with the old one-period slide.
+  const dur = round(36 / speed, 2);
+  let dx = round(2 * (c.x2 - c.x1), 4), dy = round(2 * (c.y2 - c.y1), 4);
   if (reverse) { dx = -dx; dy = -dy; }
   return {
-    spread: ` spreadMethod="repeat"`,
+    spread: ` spreadMethod="reflect"`,
     el: `\n      <animateTransform attributeName="gradientTransform" type="translate" from="0 0" to="${dx} ${dy}" dur="${dur}s" repeatCount="indefinite"/>`,
   };
 }
