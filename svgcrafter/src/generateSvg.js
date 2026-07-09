@@ -3,33 +3,23 @@
 // Pure function: config in -> self-contained SVG string out.
 //   1. NO DOM access (text widths are measured by the caller) -> unit-testable.
 //   2. CSS + SMIL only, never <script> -> survives GitHub's image proxy.
-//
-// Animation engine supports:
-//   - multiple sentences that type in, hold, delete, then cycle (looping)
-//   - two typing modes: "smooth" (clip reveal) and "char" (one letter at a time)
-//   - an optional blinking cursor that follows the typing edge
-// Every colour is a "paint" (solid or multi-stop gradient with direction).
 // ---------------------------------------------------------------------------
 
 const FONT_STACK = "'Segoe UI', system-ui, -apple-system, Arial, sans-serif";
-const CHAR_TYPE = 0.13;   // seconds per character while typing
-const CHAR_DELETE = 0.07; // seconds per character while deleting
-const PADDING = 28;       // horizontal text inset used by auto-sizing
+const CHAR_TYPE = 0.13;
+const CHAR_DELETE = 0.07;
+const PADDING = 28;
 
 const op = (v) => Math.max(0, Math.min(100, Number(v))) / 100;
 const round = (n, d = 3) => Number(Number(n).toFixed(d));
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 
-// The dimensions the banner takes when sized to fit the text. Exported so the
-// UI can seed its width/height sliders with the live auto value (one formula,
-// no drift between the app and the generator).
 export function autoSize(sentences = [], fontSize = 40) {
   const widths = sentences.map((s) => s.width || 0);
   const maxWidth = Math.max(...widths, 40);
   return { width: Math.round(maxWidth + PADDING * 2), height: Math.round(fontSize * 2.2) };
 }
 
-// --- colour helpers --------------------------------------------------------
 function hexToRgb(hex) {
   let h = String(hex).replace("#", "");
   if (h.length === 3) h = h.split("").map((c) => c + c).join("");
@@ -50,7 +40,6 @@ function angleToCoords(angle) {
   const dx = Math.cos(a), dy = Math.sin(a);
   return { x1: round(0.5 - dx / 2), y1: round(0.5 - dy / 2), x2: round(0.5 + dx / 2), y2: round(0.5 + dy / 2) };
 }
-// Optional gradient animation: rotate around centre, or slide along its axis.
 function gradientAnim(paint, c) {
   const mode = paint.anim || "none";
   if (mode === "none") return { spread: "", el: "" };
@@ -65,12 +54,12 @@ function gradientAnim(paint, c) {
       el: `\n      <animateTransform attributeName="gradientTransform" type="rotate" from="${from}" to="${to}" dur="${dur}s" repeatCount="indefinite"/>`,
     };
   }
-  // move: translate by one full period along the gradient vector (seamless w/ repeat)
-  const dur = round(18 / speed, 2);
-  let dx = round(c.x2 - c.x1, 4), dy = round(c.y2 - c.y1, 4);
+  // reflect tiling: seamless loop, no hard stop-boundary seam
+  const dur = round(36 / speed, 2);
+  let dx = round(2 * (c.x2 - c.x1), 4), dy = round(2 * (c.y2 - c.y1), 4);
   if (reverse) { dx = -dx; dy = -dy; }
   return {
-    spread: ` spreadMethod="repeat"`,
+    spread: ` spreadMethod="reflect"`,
     el: `\n      <animateTransform attributeName="gradientTransform" type="translate" from="0 0" to="${dx} ${dy}" dur="${dur}s" repeatCount="indefinite"/>`,
   };
 }
@@ -101,9 +90,7 @@ function paintMain(paint) {
   return s ? { color: adjustBrightness(s.color, s.brightness), opacity: op(s.opacity) } : { color: "#000000", opacity: 1 };
 }
 
-// --- typing timeline -------------------------------------------------------
-// Builds, for each sentence, the (time,width) control points of its clip rect
-// across one full loop, plus a single cursor path that follows the active edge.
+// ---- typing timeline -------------------------------------------------------
 function buildTimeline(sentences, mode, holdDuration, speed = 1) {
   const isChar = mode === "char";
   const ct = CHAR_TYPE / speed;
@@ -148,16 +135,11 @@ function buildTimeline(sentences, mode, holdDuration, speed = 1) {
     return full;
   };
 
-  // Cursor follows whichever sentence is active (slots are contiguous).
-  // Points are absolute x (sentence start offset + revealed width) so the
-  // cursor lands correctly for centred / right / justified sentences.
   const cursorPts = [];
   for (const s of slots) for (const [t, w] of slotPoints(s)) cursorPts.push([s.S + t, (s.startX || 0) + w]);
-
   return { T, slots, perSentence: slots.map(toFull), cursorPts };
 }
 
-// Turn (time,value) points into SMIL keyTimes/values arrays over [0,T].
 function toAnim(points, T, valueFn = (w) => w) {
   const cleaned = [];
   for (const [t, w] of points) {
@@ -176,11 +158,6 @@ function toAnim(points, T, valueFn = (w) => w) {
   return { keyTimes: keyTimes.join(";"), values: values.join(";") };
 }
 
-// --- crossfade-style transitions (CSS @keyframes) --------------------------
-// Sentences cycle on one shared loop. Each is shown for `hold`, then over
-// `trans` the current sentence animates "out" while the next animates "in"
-// (their windows overlap = crossfade). Built as per-sentence CSS @keyframes so
-// it runs inside GitHub's proxied <img> (declarative, no JS) like the cursor.
 function transitionStates(kind, width, fontSize) {
   const dx = round(width * 0.32, 1);
   const dy = round(fontSize * 0.9, 1);
@@ -217,14 +194,13 @@ function buildTransitionCss(count, kind, hold, trans, width, fontSize) {
         [pct(tHoldEnd), st.vis], [pct(tExitEnd), st.exit], [100, st.enter],
       ];
     } else {
-      // last sentence: its "out" wraps into the start of the loop
       frames = [
         [0, st.vis], [pct(tExitEnd - T), st.exit],
         [pct(start), st.enter], [pct(tEnterEnd), st.vis], [100, st.vis],
       ];
     }
     frames.sort((a, b) => a[0] - b[0]);
-    const seen = new Map();             // dedupe coincident percents (last wins)
+    const seen = new Map();
     for (const [p, decl] of frames) seen.set(p, decl);
     const stops = [...seen.entries()].map(([p, decl]) => `${p}% { ${decl} }`).join(" ");
     rules.push(`@keyframes tkf${i} { ${stops} }`);
@@ -234,31 +210,688 @@ function buildTransitionCss(count, kind, hold, trans, width, fontSize) {
   return { css, dur: T };
 }
 
+
+function seededRand(seed) {
+  let s = (seed >>> 0) || 1;
+  const next = () => { s = Math.imul(s, 48271) >>> 0; return s / 4294967296; };
+  // Burn-in: a Lehmer LCG's first outputs are ~proportional to a small seed,
+  // which biased every effect's first random draw toward 0. Warm it up.
+  for (let i = 0; i < 5; i++) next();
+  return next;
+}
+
+// ── 1. LIGHTNING ─────────────────────────────────────────────────────────────
+// Real bolt shapes: jagged polylines striking downward from the top edge, each
+// with a short branch and a soft glow underlay. Flicker is a CSS double-flash
+// with steps(1). Groups start opacity="0" and use NEGATIVE animation delays so
+// every bolt is already mid-cycle at load — no first-frame flash.
+function buildLightning(cfg, W, H, br) {
+  const color  = cfg.color  || "#a78bfa";
+  const o      = op(cfg.opacity  ?? 85);
+  const speed  = clamp(Number(cfg.speed)  || 5, 1, 10);
+  const bolts  = clamp(Math.round(cfg.bolts ?? 3), 1, 6);
+  const jitter = clamp(Number(cfg.jitter) || 8, 2, 20);
+
+  const cycle = round(9 / speed + 1.5, 2); // full flicker period per bolt
+  const core  = adjustBrightness(color, 165);
+  const defs  = [`<clipPath id="ltClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`];
+  const els   = [];
+  const css   = [];
+
+  // Bolt spawns from a random EDGE (top / left / right / bottom) at a random
+  // position along it, striking inward. dir = unit vector into the banner;
+  // perp = unit vector for zigzag jitter.
+  function boltPoints(r) {
+    const edgeRoll = r();
+    let ox, oy, dir, perp, span;
+    if (edgeRoll < 0.4) {        // top → down
+      ox = W * (0.08 + r() * 0.84); oy = -3;
+      dir = [0, 1]; perp = [1, 0]; span = H;
+    } else if (edgeRoll < 0.6) { // bottom → up
+      ox = W * (0.08 + r() * 0.84); oy = H + 3;
+      dir = [0, -1]; perp = [1, 0]; span = H;
+    } else if (edgeRoll < 0.8) { // left → right
+      ox = -3; oy = H * (0.15 + r() * 0.7);
+      dir = [1, 0]; perp = [0, 1]; span = W * 0.55;
+    } else {                     // right → left
+      ox = W + 3; oy = H * (0.15 + r() * 0.7);
+      dir = [-1, 0]; perp = [0, 1]; span = W * 0.55;
+    }
+    const segs  = 6 + Math.floor(r() * 3);          // 6-8 kinks
+    const depth = span * (0.7 + r() * 0.28);        // strike depth into banner
+    const lean  = (r() - 0.5) * 2;                  // overall sideways lean
+    const pts = [[round(ox, 1), round(oy, 1)]];
+    let off = 0;
+    for (let i = 1; i <= segs; i++) {
+      const along = (i / segs) * depth;
+      off += lean * (jitter * 0.4) + (r() - 0.5) * jitter * 2.2;
+      pts.push([
+        round(ox + dir[0] * along + perp[0] * off, 1),
+        round(oy + dir[1] * along + perp[1] * off, 1),
+      ]);
+    }
+    return { pts, dir, perp };
+  }
+  const toPoly = (pts) => pts.map((p) => `${p[0]},${p[1]}`).join(" ");
+
+  for (let b = 0; b < bolts; b++) {
+    const r  = seededRand(211 + b * 53);
+    const { pts: main, dir, perp } = boltPoints(r);
+
+    // Branch: fork off a mid point, shorter and thinner, diverging sideways
+    const fi = 2 + Math.floor(r() * (main.length - 4));
+    const side = r() < 0.5 ? -1 : 1;
+    const branch = [main[fi]];
+    let bx = main[fi][0], by = main[fi][1];
+    for (let k = 1; k <= 3; k++) {
+      const sideStep  = side * jitter * (0.8 + r() * 1.2);
+      const alongStep = Math.min(W, H) * 0.08 * (0.6 + r() * 0.8);
+      bx += perp[0] * sideStep + dir[0] * alongStep;
+      by += perp[1] * sideStep + dir[1] * alongStep;
+      branch.push([round(bx, 1), round(by, 1)]);
+    }
+
+    const sw = round(1.2 + r() * 0.9, 2);
+    const shape = (pts, w, col, alpha) =>
+      `<polyline points="${toPoly(pts)}" fill="none" stroke="${col}" stroke-width="${w}" stroke-opacity="${alpha}" stroke-linejoin="round" stroke-linecap="round"/>`;
+
+    // Double-flash flicker: on → dim → on → off, then dark for the rest.
+    const g = `lt${b}`;
+    const delay = round(-(r() * cycle), 2); // negative: staggered, mid-cycle at load
+    css.push(
+      `@keyframes ${g}f{0%{opacity:0}3%{opacity:1}6%{opacity:.25}9%{opacity:1}14%{opacity:0}100%{opacity:0}}`,
+      `.${g}{animation:${g}f ${cycle}s ${delay}s steps(1,end) infinite}`
+    );
+
+    els.push(
+      `<g class="${g}" opacity="0" clip-path="url(#ltClip)">` +
+      shape(main, sw * 3.2, color, round(o * 0.25, 3)) +   // glow underlay
+      shape(branch, sw * 0.7, color, round(o * 0.8, 3)) +  // branch
+      shape(main, sw, core, round(o, 3)) +                 // bright core
+      `</g>`
+    );
+  }
+
+  return { defs, els, css: css.join("\n    ") };
+}
+
+// ── 2. SOUND WAVES ───────────────────────────────────────────────────────────
+// Sine waves that TRAVEL horizontally: SMIL animates `d` through a full phase
+// cycle (0 → 2π in quarter steps, linear) so crests glide across the banner
+// instead of flapping in place. Alternating rows travel in opposite directions.
+function buildSoundWaves(cfg, W, H, br) {
+  const color  = cfg.color     || "#38bdf8";
+  const o      = op(cfg.opacity ?? 45);
+  const speed  = clamp(Number(cfg.speed) || 4, 1, 10);
+  const count  = clamp(Math.round(cfg.count ?? 4), 1, 8);
+  const sw     = clamp(Number(cfg.strokeWidth) || 1.5, 0.5, 4);
+
+  const dur  = round(14 / speed, 2);
+  const defs = [`<clipPath id="swClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`];
+  const els  = [];
+  const rand = seededRand(77);
+
+  function wavePath(cy, amp, phase, cycles, steps = 48) {
+    const pts = [];
+    for (let i = 0; i <= steps; i++) {
+      const x = round((i / steps) * W, 1);
+      const y = round(cy + amp * Math.sin((i / steps) * Math.PI * 2 * cycles + phase), 2);
+      pts.push(i === 0 ? `M ${x} ${y}` : `L ${x} ${y}`);
+    }
+    return pts.join(" ");
+  }
+
+  els.push(`<g clip-path="url(#swClip)">`);
+  for (let i = 0; i < count; i++) {
+    const t = count <= 1 ? 0.5 : i / (count - 1);
+    const cy     = round(H * (0.22 + t * 0.56), 1);
+    const amp    = round(H * (0.05 + rand() * 0.05), 1);
+    const cycles = round(1.5 + rand() * 1.5, 2);
+    const waveO  = round(o * (0.45 + (1 - t) * 0.55), 3);
+    const rowDur = round(dur * (0.8 + rand() * 0.5), 2);
+    const dirSign = i % 2 === 0 ? 1 : -1; // alternate travel direction
+
+    // Phase steps: equal quarters of a full cycle → constant travel speed
+    const states = [0, 1, 2, 3, 4]
+      .map((k) => wavePath(cy, amp, dirSign * k * (Math.PI / 2), cycles))
+      .join(";");
+
+    els.push(
+      `<path d="${wavePath(cy, amp, 0, cycles)}" fill="none" stroke="${color}" ` +
+      `stroke-width="${sw}" stroke-opacity="${waveO}" stroke-linecap="round">` +
+      `<animate attributeName="d" values="${states}" dur="${rowDur}s" begin="${round(-rand() * rowDur, 2)}s" repeatCount="indefinite" calcMode="linear"/>` +
+      `</path>`
+    );
+  }
+  els.push(`</g>`);
+
+  return { defs, els, css: "" };
+}
+
+// ── 3. PARTICLES ─────────────────────────────────────────────────────────────
+// Circles drifting upward on a gentle S-curve, fading in/out. Baseline
+// opacity="0" + negative begin → every particle mid-flight at load, no flash.
+function buildParticles(cfg, W, H, br) {
+  const color = cfg.color  || "#f472b6";
+  const o     = op(cfg.opacity ?? 70);
+  const speed = clamp(Number(cfg.speed) || 3, 1, 10);
+  const count = clamp(Math.round(cfg.count ?? 15), 3, 40);
+  const size  = clamp(Number(cfg.size) || 3, 1, 10);
+
+  const rand    = seededRand(55);
+  const baseDur = round(18 / speed, 2);
+  const defs = [`<clipPath id="ptClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`];
+  const els = [`<g clip-path="url(#ptClip)">`];
+
+  for (let i = 0; i < count; i++) {
+    const cx    = round(rand() * W, 1);
+    const cy    = round(H * (0.55 + rand() * 0.5), 1);   // start low, some below edge
+    const r     = round(size * (0.4 + rand() * 0.8), 1);
+    const dur   = round(baseDur * (0.55 + rand() * 0.75), 2);
+    const begin = round(-(rand() * dur), 2);              // negative: mid-cycle at load
+    const sway  = round((rand() - 0.5) * W * 0.18, 1);
+    const riseY = round(-(H * (0.75 + rand() * 0.45)), 1);
+    const pO    = round(o * (0.55 + rand() * 0.45), 3);
+
+    els.push(
+      `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" opacity="0">` +
+      `<animateTransform attributeName="transform" type="translate" ` +
+      `values="0 0;${round(sway * 0.7, 1)} ${round(riseY * 0.5, 1)};${round(sway * 0.2, 1)} ${riseY}" ` +
+      `keyTimes="0;0.5;1" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="linear"/>` +
+      `<animate attributeName="opacity" values="0;${pO};${pO};0" keyTimes="0;0.12;0.65;1" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
+      `</circle>`
+    );
+  }
+  els.push(`</g>`);
+
+  return { defs, els, css: "" };
+}
+
+// ── 4. SCANLINES ─────────────────────────────────────────────────────────────
+// Fine CRT grid (clipped to the rounded banner) + a soft glowing beam sweeping
+// top → bottom. Beam uses a NEGATIVE begin so it's mid-sweep at load.
+function buildScanlines(cfg, W, H, br) {
+  const color   = cfg.color      || "#ffffff";
+  const o       = op(cfg.opacity  ?? 18);
+  const speed   = clamp(Number(cfg.speed) || 3, 1, 10);
+  const lineGap = clamp(Math.round(cfg.lineGap   ?? 4), 2, 20);
+  const beamH   = clamp(Math.round(cfg.beamHeight ?? 36), 8, 100);
+
+  const dur  = round(9 / speed, 2);
+  const defs = [];
+  const els  = [];
+
+  const gradId = "scBeamGrad";
+  const clipId = "scClip";
+  defs.push(
+    `<linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">` +
+    `<stop offset="0%" stop-color="${color}" stop-opacity="0"/>` +
+    `<stop offset="45%" stop-color="${color}" stop-opacity="${round(o * 1.6, 3)}"/>` +
+    `<stop offset="55%" stop-color="${color}" stop-opacity="${round(o * 1.6, 3)}"/>` +
+    `<stop offset="100%" stop-color="${color}" stop-opacity="0"/>` +
+    `</linearGradient>`,
+    `<clipPath id="${clipId}"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`
+  );
+
+  // Static grid — clipped so lines don't poke past rounded corners
+  const lineEls = [];
+  for (let y = lineGap; y < H; y += lineGap) {
+    lineEls.push(`<line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="${color}" stroke-width="0.5" stroke-opacity="${round(o * 0.45, 3)}"/>`);
+  }
+
+  const travel = H + beamH * 2;
+  els.push(
+    `<g clip-path="url(#${clipId})">` +
+    `<g>${lineEls.join("")}</g>` +
+    `<rect x="0" y="${-beamH}" width="${W}" height="${beamH}" fill="url(#${gradId})">` +
+    `<animateTransform attributeName="transform" type="translate" from="0 0" to="0 ${travel}" dur="${dur}s" begin="${round(-dur * 0.45, 2)}s" repeatCount="indefinite"/>` +
+    `</rect>` +
+    `</g>`
+  );
+
+  return { defs, els, css: "" };
+}
+
+// ── 5. SHIMMER ───────────────────────────────────────────────────────────────
+// Diagonal gloss sweep with a dwell: the beam crosses in the first 40% of the
+// period, then rests off-screen. keyTimes-based SMIL, negative begin.
+function buildShimmer(cfg, W, H, br) {
+  const color = cfg.color      || "#ffffff";
+  const o     = op(cfg.opacity  ?? 55);
+  const speed = clamp(Number(cfg.speed) || 3, 1, 10);
+  const beamW = clamp(Math.round(cfg.beamWidth ?? 100), 20, 300);
+
+  const period = round(16 / speed, 2);
+  const defs = [];
+  const els  = [];
+
+  const gradId = "shimGrad";
+  const clipId = "shimClip";
+  defs.push(
+    `<linearGradient id="${gradId}" x1="0" y1="0" x2="1" y2="0">` +
+    `<stop offset="0%"   stop-color="${color}" stop-opacity="0"/>` +
+    `<stop offset="38%"  stop-color="${color}" stop-opacity="${round(o * 0.45, 3)}"/>` +
+    `<stop offset="50%"  stop-color="${color}" stop-opacity="${round(o, 3)}"/>` +
+    `<stop offset="62%"  stop-color="${color}" stop-opacity="${round(o * 0.45, 3)}"/>` +
+    `<stop offset="100%" stop-color="${color}" stop-opacity="0"/>` +
+    `</linearGradient>`,
+    `<clipPath id="${clipId}"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`
+  );
+
+  const skewRad = 20 * Math.PI / 180;
+  const extraX  = Math.round(H * Math.tan(skewRad));
+  const startX  = -(beamW + extraX);
+  const travel  = W + beamW + extraX * 2;
+
+  els.push(
+    `<g clip-path="url(#${clipId})">` +
+    `<g transform="skewX(-20)">` +
+    `<rect x="${startX}" y="0" width="${beamW}" height="${H}" fill="url(#${gradId})">` +
+    `<animateTransform attributeName="transform" type="translate" ` +
+    `values="0 0;${travel} 0;${travel} 0" keyTimes="0;0.4;1" ` +
+    `dur="${period}s" begin="${round(-period * 0.15, 2)}s" repeatCount="indefinite" ` +
+    `calcMode="spline" keySplines="0.35 0 0.65 1;0 0 1 1"/>` +
+    `</rect>` +
+    `</g>` +
+    `</g>`
+  );
+
+  return { defs, els, css: "" };
+}
+
+// ── 6. PULSE RINGS ───────────────────────────────────────────────────────────
+// Ellipses expanding from center with a quick pop-in then long fade.
+// Baseline stroke-opacity="0" + negative begin → rings mid-expand at load.
+function buildPulseRings(cfg, W, H, br) {
+  const color = cfg.color  || "#818cf8";
+  const o     = op(cfg.opacity ?? 60);
+  const speed = clamp(Number(cfg.speed) || 3, 1, 10);
+  const count = clamp(Math.round(cfg.count ?? 3), 1, 8);
+  const sw    = clamp(Number(cfg.strokeWidth) || 1.5, 0.5, 4);
+
+  const dur   = round(10 / speed, 2);
+  const cx    = round(W / 2, 1);
+  const cy    = round(H / 2, 1);
+  const maxRx = round(W / 2 + sw * 2, 1);
+  const maxRy = round(H / 2 + sw * 2, 1);
+  const defs  = [`<clipPath id="prClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`];
+  const els   = [`<g clip-path="url(#prClip)">`];
+
+  for (let i = 0; i < count; i++) {
+    const begin = round(-(i / count) * dur, 2); // negative stagger
+    els.push(
+      `<ellipse cx="${cx}" cy="${cy}" rx="2" ry="2" fill="none" stroke="${color}" stroke-width="${sw}" stroke-opacity="0">` +
+      `<animate attributeName="rx" values="2;${maxRx}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="spline" keySplines="0.25 0 0.65 1"/>` +
+      `<animate attributeName="ry" values="2;${maxRy}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="spline" keySplines="0.25 0 0.65 1"/>` +
+      `<animate attributeName="stroke-opacity" values="0;${round(o, 3)};${round(o * 0.6, 3)};0" keyTimes="0;0.08;0.55;1" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
+      `</ellipse>`
+    );
+  }
+  els.push(`</g>`);
+
+  return { defs, els, css: "" };
+}
+
+// ── 7. MATRIX RAIN ───────────────────────────────────────────────────────────
+// Falling dotted columns with bright head dots. One shared clip group; every
+// column uses a NEGATIVE begin so the rain is already falling at load.
+function buildMatrixRain(cfg, W, H, br) {
+  const color   = cfg.color    || "#4ade80";
+  const o       = op(cfg.opacity ?? 55);
+  const speed   = clamp(Number(cfg.speed) || 5, 1, 10);
+  const columns = clamp(Math.round(cfg.columns ?? 12), 3, 30);
+  const dotSize = clamp(Number(cfg.dotSize) || 3, 1, 8);
+
+  const rand    = seededRand(13);
+  const baseDur = round(14 / speed, 2);
+  const head    = adjustBrightness(color, 150);
+  const defs    = [`<clipPath id="mrClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`];
+  const els     = [`<g clip-path="url(#mrClip)">`];
+
+  for (let i = 0; i < columns; i++) {
+    const cellW  = W / columns;
+    const cx     = round((i + 0.2 + rand() * 0.6) * cellW, 1); // jittered off the grid
+    const colH   = round(H * (0.35 + rand() * 0.55), 1);
+    const dur    = round(baseDur * (0.55 + rand() * 0.7), 2);
+    const begin  = round(-(rand() * dur), 2);                   // negative: mid-fall
+    const colO   = round(o * (0.45 + rand() * 0.55), 3);
+    const dashOn  = round(dotSize * 0.9, 1);
+    const dashOff = round(dotSize * 1.4, 1);
+    const startY  = -colH;
+    const travel  = round(H + colH, 1);
+
+    els.push(
+      `<line x1="${cx}" y1="${startY}" x2="${cx}" y2="0" ` +
+      `stroke="${color}" stroke-width="${round(dotSize * 0.5, 1)}" stroke-opacity="${colO}" ` +
+      `stroke-dasharray="${dashOn} ${dashOff}" stroke-linecap="round">` +
+      `<animateTransform attributeName="transform" type="translate" from="0 0" to="0 ${travel}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
+      `</line>` +
+      `<circle cx="${cx}" cy="0" r="${round(dotSize * 0.6, 1)}" fill="${head}" fill-opacity="${round(Math.min(1, colO * 1.9), 3)}">` +
+      `<animateTransform attributeName="transform" type="translate" from="0 0" to="0 ${travel}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
+      `</circle>`
+    );
+  }
+  els.push(`</g>`);
+
+  return { defs, els, css: "" };
+}
+
+// ── Hue helper (local) ───────────────────────────────────────────────────────
+// Rotate a hex colour's hue by `deg` degrees. Used by confetti/aurora to build
+// small palettes anchored to the user's chosen colour.
+function hueShift(hex, deg) {
+  const { r, g, b } = hexToRgb(hex);
+  const rf = r / 255, gf = g / 255, bf = b / 255;
+  const mx = Math.max(rf, gf, bf), mn = Math.min(rf, gf, bf);
+  const l = (mx + mn) / 2;
+  let h = 0, s = 0;
+  if (mx !== mn) {
+    const d = mx - mn;
+    s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+    if (mx === rf) h = ((gf - bf) / d + (gf < bf ? 6 : 0)) / 6;
+    else if (mx === gf) h = ((bf - rf) / d + 2) / 6;
+    else h = ((rf - gf) / d + 4) / 6;
+  }
+  h = (h + deg / 360 + 1) % 1;
+  const hue2 = (p, q, t) => {
+    t = (t + 1) % 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+  let r2, g2, b2;
+  if (s === 0) { r2 = g2 = b2 = l; }
+  else {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r2 = hue2(p, q, h + 1 / 3); g2 = hue2(p, q, h); b2 = hue2(p, q, h - 1 / 3);
+  }
+  return rgbToHex(r2 * 255, g2 * 255, b2 * 255);
+}
+
+// ── 8. BORDER BEAM ───────────────────────────────────────────────────────────
+// Glowing comet(s) orbiting the banner's border. A rounded rect with
+// pathLength="100" gets a dash pattern; SMIL animates stroke-dashoffset so the
+// dash travels around the perimeter. Three stacked strokes (wide faint glow,
+// mid tail, bright head segment) fake a fading comet tail.
+function buildBorderBeam(cfg, W, H, br) {
+  const color = cfg.color || "#38bdf8";
+  const o     = op(cfg.opacity ?? 90);
+  const speed = clamp(Number(cfg.speed) || 4, 1, 10);
+  const count = clamp(Math.round(cfg.count ?? 1), 1, 4);
+  const tail  = clamp(Number(cfg.tailLength) || 18, 5, 40);   // % of perimeter
+  const thick = clamp(Number(cfg.thickness) || 3, 1, 8);
+
+  const dur    = round(24 / speed, 2);
+  const head   = adjustBrightness(color, 165);
+  const inset  = thick / 2 + 0.5;
+  const rx     = Math.max(0, br - inset);
+  const rectAttrs = `x="${round(inset, 1)}" y="${round(inset, 1)}" width="${round(W - inset * 2, 1)}" height="${round(H - inset * 2, 1)}" rx="${round(rx, 1)}" fill="none" pathLength="100" stroke-linecap="round"`;
+
+  // count comets evenly spaced → dash pattern repeats every 100/count units
+  const seg = 100 / count;
+  const layer = (len, w, col, alpha, shift) => {
+    const on  = round(Math.min(len, seg * 0.9), 2);
+    const offv = round(seg - on, 2);
+    return (
+      `<rect ${rectAttrs} stroke="${col}" stroke-width="${round(w, 2)}" stroke-opacity="${round(alpha, 3)}" ` +
+      `stroke-dasharray="${on} ${offv}">` +
+      `<animate attributeName="stroke-dashoffset" from="${round(shift, 2)}" to="${round(shift - 100, 2)}" dur="${dur}s" repeatCount="indefinite"/>` +
+      `</rect>`
+    );
+  };
+
+  // Dashes lead with their END edge as offset decreases, so shorter layers are
+  // shifted to align at the head (leading edge) of the longest dash.
+  const els = [
+    layer(tail,        thick * 2.6, color, o * 0.22, 0),               // soft glow
+    layer(tail,        thick,       color, o * 0.75, 0),               // main tail
+    layer(tail * 0.28, thick,       head,  o,        tail * 0.72),     // bright head
+  ];
+
+  return { defs: [], els, css: "" };
+}
+
+// ── 9. SPARKLES ──────────────────────────────────────────────────────────────
+// Classic 4-point star sparkles that twinkle in place: scale pop + opacity
+// pulse, staggered with negative begins. Baseline opacity="0" → no flash.
+function buildSparkles(cfg, W, H, br) {
+  const color = cfg.color || "#fde047";
+  const o     = op(cfg.opacity ?? 85);
+  const speed = clamp(Number(cfg.speed) || 4, 1, 10);
+  const count = clamp(Math.round(cfg.count ?? 10), 3, 30);
+  const size  = clamp(Number(cfg.size) || 5, 2, 12);
+
+  const rand    = seededRand(313);
+  const baseDur = round(9 / speed, 2);
+  const defs = [`<clipPath id="spClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`];
+  const els  = [`<g clip-path="url(#spClip)">`];
+
+  // Concave 4-point star centred on the origin, radius s
+  const starPath = (s) => {
+    const q = round(s * 0.18, 2);
+    return `M 0 ${-s} Q ${q} ${-q} ${s} 0 Q ${q} ${q} 0 ${s} Q ${-q} ${q} ${-s} 0 Q ${-q} ${-q} 0 ${-s} Z`;
+  };
+
+  for (let i = 0; i < count; i++) {
+    const x     = round(W * (0.04 + rand() * 0.92), 1);
+    const y     = round(H * (0.1 + rand() * 0.8), 1);
+    const s     = round(size * (0.5 + rand() * 0.8), 2);
+    const dur   = round(baseDur * (0.6 + rand() * 0.9), 2);
+    const begin = round(-(rand() * dur), 2);
+    const pO    = round(o * (0.6 + rand() * 0.4), 3);
+    const rot   = Math.round(rand() * 90);
+
+    els.push(
+      `<g transform="translate(${x} ${y}) rotate(${rot})">` +
+      `<path d="${starPath(s)}" fill="${color}" opacity="0">` +
+      `<animateTransform attributeName="transform" type="scale" values="0.25;1;0.25" keyTimes="0;0.5;1" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>` +
+      `<animate attributeName="opacity" values="0;${pO};0" keyTimes="0;0.5;1" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
+      `</path>` +
+      `</g>`
+    );
+  }
+  els.push(`</g>`);
+
+  return { defs, els, css: "" };
+}
+
+// ── 10. CONFETTI ─────────────────────────────────────────────────────────────
+// Small rectangles tumbling downward with sideways sway. A 4-colour palette is
+// derived from the base colour via hue rotation. Pieces start above the banner
+// (clipped) and use negative begins → already raining at load.
+function buildConfetti(cfg, W, H, br) {
+  const color = cfg.color || "#f472b6";
+  const o     = op(cfg.opacity ?? 90);
+  const speed = clamp(Number(cfg.speed) || 4, 1, 10);
+  const count = clamp(Math.round(cfg.count ?? 18), 5, 40);
+  const size  = clamp(Number(cfg.size) || 5, 2, 10);
+
+  const rand    = seededRand(97);
+  const baseDur = round(16 / speed, 2);
+  const palette = [color, hueShift(color, 45), hueShift(color, -45), hueShift(color, 160)];
+  const defs = [`<clipPath id="cfClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`];
+  const els  = [`<g clip-path="url(#cfClip)">`];
+
+  for (let i = 0; i < count; i++) {
+    const x     = round(W * rand(), 1);
+    const w     = round(size * (0.6 + rand() * 0.7), 1);
+    const h     = round(w * (0.4 + rand() * 0.3), 1);
+    const col   = palette[Math.floor(rand() * palette.length)];
+    const dur   = round(baseDur * (0.55 + rand() * 0.8), 2);
+    const begin = round(-(rand() * dur), 2);
+    const sway  = round((rand() - 0.5) * W * 0.15, 1);
+    const drop  = round(H + size * 4, 1);
+    const y0    = round(-size * 2, 1);
+    const spin  = round(240 + rand() * 480, 0) * (rand() < 0.5 ? -1 : 1);
+    const pO    = round(o * (0.7 + rand() * 0.3), 3);
+
+    els.push(
+      `<g transform="translate(${x} ${y0})">` +
+      `<g>` +
+      `<animateTransform attributeName="transform" type="translate" values="0 0;${sway} ${round(drop * 0.5, 1)};0 ${drop}" keyTimes="0;0.5;1" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="linear"/>` +
+      `<rect x="${round(-w / 2, 1)}" y="${round(-h / 2, 1)}" width="${w}" height="${h}" rx="${round(h * 0.2, 1)}" fill="${col}" fill-opacity="${pO}">` +
+      `<animateTransform attributeName="transform" type="rotate" from="0 0 0" to="${spin} 0 0" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
+      `</rect>` +
+      `</g>` +
+      `</g>`
+    );
+  }
+  els.push(`</g>`);
+
+  return { defs, els, css: "" };
+}
+
+// ── 11. AURORA ───────────────────────────────────────────────────────────────
+// Soft, blurred colour blobs drifting slowly behind the text — northern-lights
+// haze. Blobs use hue-shifted shades of the base colour, a shared Gaussian
+// blur, slow SMIL drift and gentle opacity breathing. Negative begins.
+function buildAurora(cfg, W, H, br) {
+  const color = cfg.color || "#22d3ee";
+  const o     = op(cfg.opacity ?? 45);
+  const speed = clamp(Number(cfg.speed) || 2, 1, 10);
+  const blobs = clamp(Math.round(cfg.blobs ?? 3), 1, 4);
+  const size  = clamp(Number(cfg.size) || 60, 30, 120);   // % of banner height
+
+  const rand    = seededRand(41);
+  const baseDur = round(40 / speed, 2);
+  const blur    = round(Math.max(6, H * 0.12), 1);
+  const shades  = [color, hueShift(color, 60), hueShift(color, -60), hueShift(color, 120)];
+  const defs = [
+    `<filter id="auBlur" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="${blur}"/></filter>`,
+    `<clipPath id="auClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`,
+  ];
+  const els = [`<g clip-path="url(#auClip)">`];
+
+  for (let i = 0; i < blobs; i++) {
+    const col   = shades[i % shades.length];
+    const cx    = round(W * ((i + 0.5) / blobs + (rand() - 0.5) * 0.15), 1);
+    const cy    = round(H * (0.35 + rand() * 0.35), 1);
+    const ry    = round(H * (size / 100) * (0.45 + rand() * 0.25), 1);
+    const rx    = round(ry * (1.6 + rand() * 0.9), 1);
+    const dur   = round(baseDur * (0.7 + rand() * 0.6), 2);
+    const begin = round(-(rand() * dur), 2);
+    const dx    = round(W * (0.1 + rand() * 0.12) * (i % 2 === 0 ? 1 : -1), 1);
+    const dy    = round(H * 0.08 * (rand() < 0.5 ? 1 : -1), 1);
+    const pO    = round(o * (0.55 + rand() * 0.45), 3);
+
+    els.push(
+      `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${col}" opacity="0" filter="url(#auBlur)">` +
+      `<animateTransform attributeName="transform" type="translate" values="0 0;${dx} ${dy};0 0" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>` +
+      `<animate attributeName="opacity" values="${round(pO * 0.55, 3)};${pO};${round(pO * 0.55, 3)}" dur="${round(dur * 0.5, 2)}s" begin="${begin}s" repeatCount="indefinite"/>` +
+      `</ellipse>`
+    );
+  }
+  els.push(`</g>`);
+
+  return { defs, els, css: "" };
+}
+
+// ── Text motion (per-sentence) ───────────────────────────────────────────────
+// A subtle looping transform applied to a <g> WRAPPING each text element, so it
+// composes cleanly with the text's own transition (clip-path for typing, CSS
+// transforms for crossfades) instead of fighting it. Returns { className, css }
+// or null for "none". amplitude scales with font size so motion reads the same
+// at any size. Uses ease-in-out keyframes for organic, non-mechanical motion.
+
+function buildMotion(id, index, fontSize, speed = 1) {
+  if (!id || id === "none") return null;
+  const A = Math.max(3, fontSize * 0.14);          // base amplitude in px
+  const spd = clamp(Number(speed) || 1, 0.25, 4);
+  const dur = round(4 / spd, 2);                   // slower = calmer
+  const name = `mv${index}`;
+  // Slight per-sentence phase offset so stacked lines don't move in lockstep.
+  const delay = round(-(index * 0.35), 2);
+  let frames;
+  switch (id) {
+    case "float": // diagonal drifting loop
+      frames = `0%{transform:translate(0,0)}25%{transform:translate(${round(A * 0.6, 1)}px,${round(-A, 1)}px)}50%{transform:translate(0,${round(-A * 0.4, 1)}px)}75%{transform:translate(${round(-A * 0.6, 1)}px,${round(-A, 1)}px)}100%{transform:translate(0,0)}`;
+      break;
+    case "bob": // vertical up/down
+      frames = `0%,100%{transform:translateY(${round(A, 1)}px)}50%{transform:translateY(${round(-A, 1)}px)}`;
+      break;
+    case "sway": // horizontal left/right
+      frames = `0%,100%{transform:translateX(${round(-A * 1.3, 1)}px)}50%{transform:translateX(${round(A * 1.3, 1)}px)}`;
+      break;
+    case "pulse": // gentle zoom in/out
+      frames = `0%,100%{transform:scale(1)}50%{transform:scale(1.06)}`;
+      break;
+    case "wobble": // rocking rotation
+      frames = `0%,100%{transform:rotate(-2.2deg)}50%{transform:rotate(2.2deg)}`;
+      break;
+    case "orbit": // small circular path
+      frames = `0%{transform:translate(${round(A, 1)}px,0)}25%{transform:translate(0,${round(A, 1)}px)}50%{transform:translate(${round(-A, 1)}px,0)}75%{transform:translate(0,${round(-A, 1)}px)}100%{transform:translate(${round(A, 1)}px,0)}`;
+      break;
+    default:
+      return null;
+  }
+  const timing = id === "pulse" || id === "wobble" || id === "bob" || id === "sway"
+    ? "ease-in-out" : "linear";
+  const css =
+    `@keyframes ${name}{${frames}}` +
+    `.${name}{animation:${name} ${dur}s ${delay}s ${timing} infinite;` +
+    // transform-box keeps scale/rotate centred on the text's own box, not the
+    // SVG origin, so pulse/wobble/orbit pivot around the glyphs.
+    `transform-box:fill-box;transform-origin:center;}`;
+  return { className: name, css };
+}
+
+// ── Master dispatcher ────────────────────────────────────────────────────────
+function buildEffects(effects, W, H, br) {
+  if (!effects || !effects.length) return { defs: [], els: [], css: "" };
+  const allDefs = [], allEls = [], allCss = [];
+
+  for (const eff of effects) {
+    if (!eff || !eff.enabled) continue;
+    let r = null;
+    if (eff.id === "lightning")  r = buildLightning(eff,  W, H, br);
+    if (eff.id === "soundwaves") r = buildSoundWaves(eff, W, H, br);
+    if (eff.id === "particles")  r = buildParticles(eff,  W, H, br);
+    if (eff.id === "scanlines")  r = buildScanlines(eff,  W, H, br);
+    if (eff.id === "shimmer")    r = buildShimmer(eff,    W, H, br);
+    if (eff.id === "pulserings") r = buildPulseRings(eff, W, H, br);
+    if (eff.id === "matrixrain") r = buildMatrixRain(eff, W, H, br);
+    if (eff.id === "borderbeam") r = buildBorderBeam(eff, W, H, br);
+    if (eff.id === "sparkles")   r = buildSparkles(eff,   W, H, br);
+    if (eff.id === "confetti")   r = buildConfetti(eff,   W, H, br);
+    if (eff.id === "aurora")     r = buildAurora(eff,     W, H, br);
+    if (!r) continue;
+    allDefs.push(...r.defs);
+    allEls.push(...r.els);
+    if (r.css) allCss.push(r.css);
+  }
+
+  return { defs: allDefs, els: allEls, css: allCss.join("\n    ") };
+}
+
 export function generateSvg(config) {
   const {
     sentences = [{ text: "Your Name", width: 220, prefixes: [] }],
     fontSize = 40,
     fontWeight = 700,
     fontFamily = FONT_STACK,
-    embedFont = null,        // { family, dataUrl, format } -> embedded @font-face
-    transition = "typing",   // none | typing | fade | zoom | slide | rise | blur
-    transitionDuration = 0.6, // seconds, for the crossfade-style transitions
+    embedFont = null,
+    transition = "typing",
+    transitionDuration = 0.6,
     typingMode = "smooth",
     typingSpeed = 1,
     cursor = true,
     holdDuration = 1.5,
     textPaint,
+    motionSpeed = 1,
     border = false,
     borderWidth = 2,
     borderRadius = 14,
     borderPaint,
     bgPaint,
     glow = false,
-    autoWidth = true,        // false -> use bannerWidth
+    autoWidth = true,
     bannerWidth = 600,
-    autoHeight = true,       // false -> use bannerHeight
+    autoHeight = true,
     bannerHeight = 120,
-    linkUrl = "",            // wraps the SVG in a clickable <a>
+    linkUrl = "",
+    effects = [],
   } = config;
 
   const live = sentences.filter((s) => s.text && s.text.length);
@@ -269,14 +902,8 @@ export function generateSvg(config) {
   const height = autoHeight ? auto.height : Math.round(clamp(Number(bannerHeight) || auto.height, 40, 2000));
   const baseline = Math.round(height / 2 + fontSize * 0.35);
   const cursorY = Math.round((height - fontSize) / 2);
+  const br = Math.min(Number(borderRadius) || 0, width / 2, height / 2);
 
-  // Per-sentence alignment geometry. The banner width hugs the longest
-  // sentence, so shorter sentences have room to sit left / centre / right
-  // within the content band. "justify" stretches a multi-word sentence to
-  // fill the band via textLength + lengthAdjust="spacing"; the per-character
-  // prefixes are widened by the same uniform spacing so the letter-by-letter
-  // reveal still lands ~on character boundaries. Anchor stays fixed: each
-  // sentence renders at its final aligned x and reveals left-to-right.
   const contentWidth = width - padding * 2;
   const geo = list.map((s) => {
     const align = s.align || "left";
@@ -293,11 +920,20 @@ export function generateSvg(config) {
       width: renderWidth,
       prefixes: (s.prefixes || []).map((p, k) => p + extra * (k / N)),
       align,
+      motion: s.motion || "none",
       justified: canJustify,
       startX: round(startX, 2),
     };
   });
   const justifyAttr = (g) => (g.justified ? ` textLength="${round(g.width, 2)}" lengthAdjust="spacing"` : "");
+
+  // Per-sentence text motion (wraps each <text> in an animated <g>). Built once
+  // here so every transition branch can reuse it. motions[i] is null for "none".
+  const motions = geo.map((g, i) => buildMotion(g.motion, i, fontSize, motionSpeed));
+  const motionCss = motions.filter(Boolean).map((m) => m.css).join("\n    ");
+  // Wrap `el` (a <text> string) in its motion group if the sentence has motion.
+  const withMotion = (el, i) =>
+    motions[i] ? `<g class="${motions[i].className}">${el}</g>` : el;
 
   const defs = [];
   const bg = resolvePaint(bgPaint, "bgPaint", defs);
@@ -312,10 +948,14 @@ export function generateSvg(config) {
     </filter>`);
   }
 
+  // Build effects (rendered between background and text)
+  const effResult = buildEffects(effects, width, height, br);
+  defs.push(...effResult.defs);
+
   const sw = border ? borderWidth : 0;
   const inset = sw / 2;
   const bgRect =
-    `<rect x="${inset}" y="${inset}" width="${width - sw}" height="${height - sw}" rx="${borderRadius}" ` +
+    `<rect x="${inset}" y="${inset}" width="${width - sw}" height="${height - sw}" rx="${br}" ` +
     `fill="${bg.fill}" fill-opacity="${bg.opacity}"` +
     (brd ? ` stroke="${brd.fill}" stroke-opacity="${brd.opacity}" stroke-width="${borderWidth}"` : "") +
     `/>`;
@@ -325,9 +965,6 @@ export function generateSvg(config) {
     `font-family="${fontFamily}" font-size="${fontSize}" font-weight="${fontWeight}"` +
     (glow ? ` filter="url(#glow)"` : "");
 
-  // A fetched font is embedded (base64) so the SVG renders identically
-  // everywhere (GitHub's proxy won't fetch external fonts). embedFont.css is the
-  // ready-to-inline @font-face rule built by the app.
   const fontFaceCss = embedFont && embedFont.css ? embedFont.css : "";
   const styleBlock = (parts) => {
     const body = parts.filter(Boolean).join("\n    ");
@@ -335,8 +972,10 @@ export function generateSvg(config) {
   };
 
   const liveCount = list.length;
+  const effEls = effResult.els.join("\n  ");
+  const effCss = effResult.css;
 
-  // ---- typing transition (SMIL clip engine) --------------------------------
+  // ---- typing transition ---------------------------------------------------
   if (transition === "typing") {
     const mode = typingMode === "char" ? "char" : "smooth";
     const calcMode = mode === "char" ? "discrete" : "linear";
@@ -350,13 +989,13 @@ export function generateSvg(config) {
         <animate attributeName="width" values="${a.values}" keyTimes="${a.keyTimes}" dur="${round(T, 2)}s" calcMode="${calcMode}" repeatCount="indefinite"/>
       </rect>
     </clipPath>`);
-      texts.push(`<text x="${s.startX}" y="${baseline}" ${textAttrs}${justifyAttr(s)} clip-path="url(#clip${i})">${escapeXml(s.text)}</text>`);
+      texts.push(withMotion(`<text x="${s.startX}" y="${baseline}" ${textAttrs}${justifyAttr(s)} clip-path="url(#clip${i})">${escapeXml(s.text)}</text>`, i));
     });
 
     let cursorEl = "";
     let cursorCss = "";
     if (cursor) {
-      const ca = toAnim(cursorPts, T); // points are already absolute x
+      const ca = toAnim(cursorPts, T);
       cursorCss = `.cursor { animation: blink 1s steps(1) infinite; }
     @keyframes blink { 50% { opacity: 0; } }`;
       cursorEl = `<rect class="cursor" x="${geo[0].startX}" y="${cursorY}" width="3" height="${fontSize}" fill="${main.color}" fill-opacity="${main.opacity}">
@@ -365,39 +1004,40 @@ export function generateSvg(config) {
     }
 
     const inner = [
-      styleBlock([fontFaceCss, cursorCss]),
+      styleBlock([fontFaceCss, effCss, cursorCss, motionCss]),
       `<defs>\n    ${defs.join("\n    ")}\n  </defs>`,
       bgRect,
+      effEls,
       ...texts,
       cursorEl,
     ].filter(Boolean).join("\n  ");
     return wrap(width, height, geo[0].text, inner, linkUrl);
   }
 
-  // ---- single sentence, non-typing: nothing to cycle, render it static -----
+  // ---- single sentence, non-typing -----------------------------------------
   if (liveCount <= 1) {
     const g0 = geo[0];
     const inner = [
-      styleBlock([fontFaceCss]),
+      styleBlock([fontFaceCss, effCss, motionCss]),
       defs.length ? `<defs>\n    ${defs.join("\n    ")}\n  </defs>` : "",
       bgRect,
-      `<text x="${g0.startX}" y="${baseline}" ${textAttrs}${justifyAttr(g0)}>${escapeXml(g0.text)}</text>`,
+      effEls,
+      withMotion(`<text x="${g0.startX}" y="${baseline}" ${textAttrs}${justifyAttr(g0)}>${escapeXml(g0.text)}</text>`, 0),
     ].filter(Boolean).join("\n  ");
     return wrap(width, height, g0.text, inner, linkUrl);
   }
 
-  // ---- crossfade-style transitions (CSS keyframes) -------------------------
-  // "none" is a near-instant cut (a tiny, non-zero duration keeps the keyframe
-  // stops distinct so the held state doesn't interpolate into a slow fade).
+  // ---- crossfade-style transitions -----------------------------------------
   const trans = transition === "none" ? 0.05 : clamp(Number(transitionDuration) || 0.6, 0.05, 3);
   const { css: transCss } = buildTransitionCss(liveCount, transition, Math.max(0.1, Number(holdDuration) || 1.5), trans, width, fontSize);
   const transTexts = geo.map(
-    (s, i) => `<text class="tt tt${i}" x="${s.startX}" y="${baseline}" ${textAttrs}${justifyAttr(s)}>${escapeXml(s.text)}</text>`
+    (s, i) => withMotion(`<text class="tt tt${i}" x="${s.startX}" y="${baseline}" ${textAttrs}${justifyAttr(s)}>${escapeXml(s.text)}</text>`, i)
   );
   const inner = [
-    styleBlock([fontFaceCss, transCss]),
+    styleBlock([fontFaceCss, effCss, transCss, motionCss]),
     defs.length ? `<defs>\n    ${defs.join("\n    ")}\n  </defs>` : "",
     bgRect,
+    effEls,
     ...transTexts,
   ].filter(Boolean).join("\n  ");
   return wrap(width, height, geo[0].text, inner, linkUrl);
@@ -415,7 +1055,6 @@ function wrap(width, height, label, inner, linkUrl = "") {
 </svg>`;
 }
 
-// Accept bare domains by defaulting to https; pass through http/https/mailto.
 export function normalizeUrl(url) {
   const u = String(url || "").trim();
   if (!u) return "";
