@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { generateSvg, adjustBrightness, autoSize, normalizeUrl } from "./generateSvg";
 import "./App.css";
-import sunIcon from "../public/LightMode.svg";
-import moonIcon from "../public/DarkMode.svg";
 
 // Real text measurement (needs the DOM, so it stays out of generateSvg).
 // The font family must match what the SVG renders or the typing reveal drifts.
@@ -185,6 +183,33 @@ function AlignIcon({ type }) {
       ))}
     </svg>
   );
+}
+
+// ---- text motion (per-sentence, layered on top of transitions) ----
+const MOTIONS = [
+  { id: "none",   label: "No motion" },
+  { id: "float",  label: "Float" },
+  { id: "bob",    label: "Bob (up/down)" },
+  { id: "sway",   label: "Sway (left/right)" },
+  { id: "pulse",  label: "Pulse (zoom)" },
+  { id: "wobble", label: "Wobble (rock)" },
+  { id: "orbit",  label: "Orbit (circle)" },
+];
+
+// Tiny inline glyph illustrating each motion preset.
+function MotionIcon({ type }) {
+  const c = "currentColor";
+  const common = { width: 16, height: 16, viewBox: "0 0 16 16", fill: "none", stroke: c, strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true };
+  switch (type) {
+    case "none":   return <svg {...common}><circle cx="8" cy="8" r="1.4" fill={c} stroke="none"/></svg>;
+    case "float":  return <svg {...common}><path d="M3 10c2-3 3 3 5 0s3-3 5 0"/></svg>;
+    case "bob":    return <svg {...common}><path d="M8 3v10"/><path d="M5 6l3-3 3 3"/><path d="M5 10l3 3 3-3"/></svg>;
+    case "sway":   return <svg {...common}><path d="M3 8h10"/><path d="M6 5L3 8l3 3"/><path d="M10 5l3 3-3 3"/></svg>;
+    case "pulse":  return <svg {...common}><circle cx="8" cy="8" r="2.5"/><circle cx="8" cy="8" r="5.5" opacity="0.5"/></svg>;
+    case "wobble": return <svg {...common}><path d="M8 13V6"/><path d="M4.5 8.5L8 4l3.5 4.5"/></svg>;
+    case "orbit":  return <svg {...common}><circle cx="8" cy="8" r="5"/><circle cx="13" cy="8" r="1.6" fill={c} stroke="none"/></svg>;
+    default:       return null;
+  }
 }
 
 // ---- paint factories ------------------------------------------------------
@@ -387,6 +412,33 @@ function PaintControl({ label, paint, onChange, disabled }) {
 }
 
 // ============================================================================
+// COLLAPSIBLE SECTION (accordion)
+// ============================================================================
+// Reusable expanding panel. `summary` shows on the right of the header when
+// collapsed (e.g. a live value like "40px · Poppins"). `badge` shows a small
+// pill (e.g. active-effect count). Controlled-open supported via `open`/`onToggle`,
+// otherwise it manages its own state seeded by `defaultOpen`.
+function Section({ title, icon, summary, badge, defaultOpen = false, open, onToggle, children }) {
+  const [localOpen, setLocalOpen] = useState(defaultOpen);
+  const isControlled = open !== undefined;
+  const expanded = isControlled ? open : localOpen;
+  const toggle = () => (isControlled ? onToggle && onToggle(!expanded) : setLocalOpen((o) => !o));
+
+  return (
+    <div className={"section" + (expanded ? " section-open" : "")}>
+      <button type="button" className="section-head" onClick={toggle} aria-expanded={expanded}>
+        {icon && <span className="section-icon">{icon}</span>}
+        <span className="section-title">{title}</span>
+        {badge != null && badge > 0 && <span className="section-badge">{badge}</span>}
+        {!expanded && summary && <span className="section-summary">{summary}</span>}
+        <span className={"section-chevron" + (expanded ? " open" : "")}>›</span>
+      </button>
+      {expanded && <div className="section-body">{children}</div>}
+    </div>
+  );
+}
+
+// ============================================================================
 // EFFECTS TAB
 // ============================================================================
 
@@ -398,6 +450,10 @@ const EFFECT_DEFAULTS = [
   { id: "shimmer",    enabled: false, color: "#ffffff", opacity: 55, speed: 3,  beamWidth: 100 },
   { id: "pulserings", enabled: false, color: "#818cf8", opacity: 60, speed: 3,  count: 3,   strokeWidth: 1.5 },
   { id: "matrixrain", enabled: false, color: "#4ade80", opacity: 55, speed: 5,  columns: 12, dotSize: 3  },
+  { id: "borderbeam", enabled: false, color: "#38bdf8", opacity: 90, speed: 4,  count: 1,   tailLength: 18, thickness: 3 },
+  { id: "sparkles",   enabled: false, color: "#fde047", opacity: 85, speed: 4,  count: 10,  size: 5 },
+  { id: "confetti",   enabled: false, color: "#f472b6", opacity: 90, speed: 4,  count: 18,  size: 5 },
+  { id: "aurora",     enabled: false, color: "#22d3ee", opacity: 45, speed: 2,  blobs: 3,   size: 60 },
 ];
 
 const EFFECT_META = [
@@ -461,6 +517,43 @@ const EFFECT_META = [
     controls: [
       { key: "columns", label: "Columns",  type: "int",   min: 3, max: 30, step: 1 },
       { key: "dotSize", label: "Dot size", type: "float", min: 1, max: 8,  step: 0.5, fmt: v => `${v}px` },
+    ],
+  },
+  {
+    id: "borderbeam",
+    label: "◉ Border Beam",
+    desc: "Glowing comets orbit around the banner's border",
+    controls: [
+      { key: "count",      label: "Comets",    type: "int",   min: 1, max: 4,  step: 1 },
+      { key: "tailLength", label: "Tail",      type: "int",   min: 5, max: 40, step: 1, fmt: v => `${v}%` },
+      { key: "thickness",  label: "Thickness", type: "float", min: 1, max: 8,  step: 0.5, fmt: v => `${v}px` },
+    ],
+  },
+  {
+    id: "sparkles",
+    label: "✧ Sparkles",
+    desc: "Four-point stars twinkle in and out across the banner",
+    controls: [
+      { key: "count", label: "Count", type: "int",   min: 3, max: 30, step: 1 },
+      { key: "size",  label: "Size",  type: "float", min: 2, max: 12, step: 0.5, fmt: v => `${v}px` },
+    ],
+  },
+  {
+    id: "confetti",
+    label: "🎊 Confetti",
+    desc: "Colourful pieces tumble down, hues derived from your colour",
+    controls: [
+      { key: "count", label: "Count", type: "int",   min: 5, max: 40, step: 1 },
+      { key: "size",  label: "Size",  type: "float", min: 2, max: 10, step: 0.5, fmt: v => `${v}px` },
+    ],
+  },
+  {
+    id: "aurora",
+    label: "≋ Aurora",
+    desc: "Soft blurred colour blobs drift slowly behind the text",
+    controls: [
+      { key: "blobs", label: "Blobs", type: "int", min: 1, max: 4,   step: 1 },
+      { key: "size",  label: "Size",  type: "int", min: 30, max: 120, step: 5, fmt: v => `${v}%` },
     ],
   },
 ];
@@ -540,9 +633,21 @@ function EffectCard({ meta, eff, onChange }) {
   );
 }
 
+// Effects grouped by visual family so the 11 cards aren't one long scroll.
+const EFFECT_GROUPS = [
+  { title: "Ambient",  ids: ["aurora", "shimmer", "scanlines", "sparkles"] },
+  { title: "Motion",   ids: ["particles", "confetti", "matrixrain", "soundwaves"] },
+  { title: "Accent",   ids: ["lightning", "pulserings", "borderbeam"] },
+];
+
 function EffectsTab({ effects, onChange }) {
-  const update = (id, updated) => onChange(effects.map(e => e.id === id ? updated : e));
+  const update = (id, updated) => onChange(
+    effects.some(e => e.id === id)
+      ? effects.map(e => e.id === id ? updated : e)
+      : [...effects, updated]
+  );
   const activeCount = effects.filter(e => e.enabled).length;
+  const activeIn = (ids) => ids.filter(id => effects.find(e => e.id === id)?.enabled).length;
 
   return (
     <div>
@@ -551,30 +656,43 @@ function EffectsTab({ effects, onChange }) {
           ? "Enable effects to layer atmosphere onto your banner. They stack freely."
           : `${activeCount} effect${activeCount > 1 ? "s" : ""} active — expand any card to tune it.`}
       </p>
-      <div className="eff-list">
-        {EFFECT_META.map(meta => {
-          const eff = effects.find(e => e.id === meta.id) || EFFECT_DEFAULTS.find(d => d.id === meta.id);
-          return (
-            <EffectCard
-              key={meta.id}
-              meta={meta}
-              eff={eff}
-              onChange={updated => update(meta.id, updated)}
-            />
-          );
-        })}
-      </div>
+      {EFFECT_GROUPS.map((group, gi) => (
+        <Section
+          key={group.title}
+          title={group.title}
+          defaultOpen={gi === 0}
+          badge={activeIn(group.ids)}
+        >
+          <div className="eff-list">
+            {group.ids.map(id => {
+              const meta = EFFECT_META.find(m => m.id === id);
+              const eff = effects.find(e => e.id === id) || EFFECT_DEFAULTS.find(d => d.id === id);
+              return (
+                <EffectCard
+                  key={id}
+                  meta={meta}
+                  eff={eff}
+                  onChange={updated => update(id, updated)}
+                />
+              );
+            })}
+          </div>
+        </Section>
+      ))}
     </div>
   );
 }
 
 export default function App() {
-  const [theme, setTheme] = useState("dark");
   const [tab, setTab] = useState("text");
   const [copied, setCopied] = useState("");
+  const [dragSentence, setDragSentence] = useState(null);
   const [config, setConfig] = useState({
     sentences: ["Welcome 👋", "SVG Crafter"],
     sentenceAligns: ["left", "left"],
+    sentenceMotions: ["none", "none"],
+    sentenceIds: [uid(), uid()],
+    motionSpeed: 1,
     fontSize: 40,
     fontWeight: 700,
     fontId: "sans",
@@ -602,8 +720,8 @@ export default function App() {
   });
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-  }, [theme]);
+    document.documentElement.setAttribute("data-theme", "dark");
+  }, []);
 
   const set = (key) => (e) => {
     const el = e.target;
@@ -617,10 +735,12 @@ export default function App() {
     setConfig((c) => ({ ...c, sentences: c.sentences.map((s, idx) => (idx === i ? text : s)) }));
   const setSentenceAlign = (i, align) =>
     setConfig((c) => ({ ...c, sentenceAligns: c.sentenceAligns.map((a, idx) => (idx === i ? align : a)) }));
+  const setSentenceMotion = (i, motion) =>
+    setConfig((c) => ({ ...c, sentenceMotions: (c.sentenceMotions || []).map((mm, idx) => (idx === i ? motion : mm)) }));
   const addSentence = () =>
     setConfig((c) =>
       c.sentences.length < MAX_SENTENCES
-        ? { ...c, sentences: [...c.sentences, ""], sentenceAligns: [...c.sentenceAligns, "left"] }
+        ? { ...c, sentences: [...c.sentences, ""], sentenceAligns: [...c.sentenceAligns, "left"], sentenceMotions: [...(c.sentenceMotions || []), "none"], sentenceIds: [...(c.sentenceIds || c.sentences.map(uid)), uid()] }
         : c
     );
   const removeSentence = (i) =>
@@ -630,9 +750,31 @@ export default function App() {
             ...c,
             sentences: c.sentences.filter((_, idx) => idx !== i),
             sentenceAligns: c.sentenceAligns.filter((_, idx) => idx !== i),
+            sentenceMotions: (c.sentenceMotions || []).filter((_, idx) => idx !== i),
+            sentenceIds: (c.sentenceIds || []).filter((_, idx) => idx !== i),
           }
         : c
     );
+  // Reorder all parallel sentence arrays together (text, align, motion, id).
+  const moveSentence = (from, to) =>
+    setConfig((c) => {
+      const n = c.sentences.length;
+      if (from === to || from < 0 || to < 0 || from >= n || to >= n) return c;
+      const reorder = (arr) => {
+        const next = [...arr];
+        const [m] = next.splice(from, 1);
+        next.splice(to, 0, m);
+        return next;
+      };
+      const ids = c.sentenceIds || c.sentences.map(() => uid());
+      return {
+        ...c,
+        sentences: reorder(c.sentences),
+        sentenceAligns: reorder(c.sentenceAligns),
+        sentenceMotions: reorder(c.sentenceMotions || c.sentences.map(() => "none")),
+        sentenceIds: reorder(ids),
+      };
+    });
 
   // Active font family, measured sentences, and the resulting SVG.
   const fontFamily = useMemo(() => familyFor(config.fontId, config.embedFont), [config.fontId, config.embedFont]);
@@ -641,8 +783,9 @@ export default function App() {
       config.sentences.map((t, i) => ({
         ...measureSentence(t, config.fontSize, config.fontWeight, fontFamily),
         align: config.sentenceAligns[i] || "left",
+        motion: (config.sentenceMotions && config.sentenceMotions[i]) || "none",
       })),
-    [config.sentences, config.sentenceAligns, config.fontSize, config.fontWeight, fontFamily]
+    [config.sentences, config.sentenceAligns, config.sentenceMotions, config.fontSize, config.fontWeight, fontFamily]
   );
   const auto = useMemo(() => autoSize(measured, config.fontSize), [measured, config.fontSize]);
   const svg = useMemo(() => generateSvg({ ...config, sentences: measured, fontFamily }), [config, measured, fontFamily]);
@@ -754,14 +897,6 @@ export default function App() {
           <span className="wordmark">SVG <span className="accent">Crafter</span></span>
           <span className="tagline">GitHub profile banner generator</span>
         </div>
-        <button className="theme-toggle" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
-          <img
-            src={theme === "dark" ? sunIcon : moonIcon}
-            alt={theme === "dark" ? "Light mode" : "Dark mode"}
-            width={24}
-            height={24}
-          />
-        </button>
       </header>
 
       <div className="workspace">
@@ -788,12 +923,53 @@ export default function App() {
           <div className="tabpanel">
             {tab === "text" && (
               <>
+                <Section
+                  title="Sentences"
+                  defaultOpen
+                  summary={`${config.sentences.filter(s => s.trim()).length || 1} line${(config.sentences.filter(s => s.trim()).length || 1) > 1 ? "s" : ""}`}
+                >
                 <div className="field">
                   <span>Sentences{config.sentences.length > 1 ? " (cycle in order)" : ""}</span>
                   <div className="sentences">
-                    {config.sentences.map((s, i) => (
-                      <div className="sentence-item" key={i}>
+                    {config.sentences.map((s, i) => {
+                      const sid = (config.sentenceIds && config.sentenceIds[i]) || i;
+                      const multi = config.sentences.length > 1;
+                      const dragOverSentence = () => {
+                        if (dragSentence == null) return;
+                        const from = (config.sentenceIds || []).indexOf(dragSentence);
+                        if (from === -1 || from === i) return;
+                        moveSentence(from, i);
+                      };
+                      return (
+                      <div
+                        className={"sentence-item" + (dragSentence === sid ? " dragging" : "")}
+                        key={sid}
+                        onDragEnter={multi ? dragOverSentence : undefined}
+                        onDragOver={multi ? (e) => e.preventDefault() : undefined}
+                        onDrop={multi ? (e) => e.preventDefault() : undefined}
+                        onDragEnd={multi ? () => setDragSentence(null) : undefined}
+                      >
                         <div className="sentence-row">
+                          {multi && (
+                            <div className="s-reorder">
+                              <span
+                                className="grip"
+                                draggable
+                                onDragStart={(e) => {
+                                  e.dataTransfer.effectAllowed = "move";
+                                  e.dataTransfer.setData("text/plain", "");
+                                  setDragSentence(sid);
+                                }}
+                                role="button"
+                                aria-label="Drag to reorder sentence"
+                                title="Drag to reorder"
+                              >⠿</span>
+                              <div className="s-arrows">
+                                <button type="button" onClick={() => moveSentence(i, i - 1)} disabled={i === 0} aria-label="Move sentence up">▲</button>
+                                <button type="button" onClick={() => moveSentence(i, i + 1)} disabled={i === config.sentences.length - 1} aria-label="Move sentence down">▼</button>
+                              </div>
+                            </div>
+                          )}
                           <input
                             type="text"
                             value={s}
@@ -801,7 +977,7 @@ export default function App() {
                             maxLength={40}
                             placeholder={`Sentence ${i + 1}`}
                           />
-                          {config.sentences.length > 1 && (
+                          {multi && (
                             <button type="button" className="remove" onClick={() => removeSentence(i)} aria-label="Remove sentence">✕</button>
                           )}
                         </div>
@@ -823,14 +999,38 @@ export default function App() {
                             );
                           })}
                         </div>
+                        <div className="seg motion-seg" role="group" aria-label="Text motion">
+                          {MOTIONS.map((mm) => {
+                            const on = ((config.sentenceMotions && config.sentenceMotions[i]) || "none") === mm.id;
+                            return (
+                              <button
+                                key={mm.id}
+                                type="button"
+                                className={on ? "on" : ""}
+                                onClick={() => setSentenceMotion(i, mm.id)}
+                                title={mm.label}
+                                aria-label={mm.label}
+                                aria-pressed={on}
+                              >
+                                <MotionIcon type={mm.id} />
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   <button type="button" className="add" onClick={addSentence} disabled={config.sentences.length >= MAX_SENTENCES}>
                     + Add sentence
                   </button>
                 </div>
+                </Section>
 
+                <Section
+                  title="Text style"
+                  summary={`${config.fontSize}px${config.embedFont ? " · " + config.embedFont.family : config.googleFont ? " · " + config.googleFont : ""}`}
+                >
                 <PaintControl label="Text colour" paint={config.textPaint} onChange={setPaint("textPaint")} />
 
                 <div className="field">
@@ -914,7 +1114,18 @@ export default function App() {
                   <input type="checkbox" checked={config.glow} onChange={set("glow")} />
                   <span>Text glow</span>
                 </label>
+                </Section>
 
+                <Section
+                  title="Animation"
+                  summary={TRANSITIONS.find(t => t.id === config.transition)?.label || "None"}
+                >
+                {(config.sentenceMotions || []).some(mm => mm && mm !== "none") && (
+                  <label className="field">
+                    <span>Motion speed — {config.motionSpeed}x</span>
+                    <input type="range" min="0.25" max="3" step="0.25" value={config.motionSpeed} onChange={set("motionSpeed")} />
+                  </label>
+                )}
                 <div className="field">
                   <span>Transition{config.sentences.length > 1 ? "" : " (single sentence — needs 2+ to cycle)"}</span>
                   <div className="font-grid">
@@ -964,29 +1175,39 @@ export default function App() {
                     </label>
                   </div>
                 )}
+                </Section>
               </>
             )}
 
             {tab === "border" && (
               <>
-                <label className="toggle">
-                  <input type="checkbox" checked={config.border} onChange={set("border")} />
-                  <span>Show border</span>
-                </label>
-                <PaintControl label="Border colour" paint={config.borderPaint} onChange={setPaint("borderPaint")} disabled={!config.border} />
-                <label className="field">
-                  <span>Border width — {config.borderWidth}px</span>
-                  <input type="range" min="1" max="10" value={config.borderWidth} onChange={set("borderWidth")} disabled={!config.border} />
-                </label>
-                <label className="field">
-                  <span>Corner radius — {config.borderRadius}px</span>
-                  <input type="range" min="0" max="40" value={config.borderRadius} onChange={set("borderRadius")} />
-                </label>
+                <Section title="Border" defaultOpen summary={config.border ? `on · ${config.borderWidth}px` : "off"}>
+                  <label className="toggle">
+                    <input type="checkbox" checked={config.border} onChange={set("border")} />
+                    <span>Show border</span>
+                  </label>
+                  <PaintControl label="Border colour" paint={config.borderPaint} onChange={setPaint("borderPaint")} disabled={!config.border} />
+                  <label className="field">
+                    <span>Border width — {config.borderWidth}px</span>
+                    <input type="range" min="1" max="10" value={config.borderWidth} onChange={set("borderWidth")} disabled={!config.border} />
+                  </label>
+                </Section>
+                <Section title="Corners" defaultOpen summary={`${config.borderRadius}px radius`}>
+                  <label className="field">
+                    <span>Corner radius — {config.borderRadius}px</span>
+                    <input type="range" min="0" max="40" value={config.borderRadius} onChange={set("borderRadius")} />
+                  </label>
+                </Section>
               </>
             )}
 
             {tab === "background" && (
               <>
+                <Section
+                  title="Dimensions"
+                  defaultOpen
+                  summary={`${config.autoWidth ? "auto" : config.bannerWidth} × ${config.autoHeight ? "auto" : config.bannerHeight}`}
+                >
                 <div className="field">
                   <span>Width</span>
                   <div className="seg">
@@ -1014,8 +1235,11 @@ export default function App() {
                     <input type="range" min="60" max="400" step="10" value={config.bannerHeight} onChange={set("bannerHeight")} />
                   </label>
                 )}
+                </Section>
 
-                <PaintControl label="Background" paint={config.bgPaint} onChange={setPaint("bgPaint")} />
+                <Section title="Fill" defaultOpen>
+                  <PaintControl label="Background" paint={config.bgPaint} onChange={setPaint("bgPaint")} />
+                </Section>
               </>
             )}
 
