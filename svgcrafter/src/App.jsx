@@ -386,6 +386,188 @@ function PaintControl({ label, paint, onChange, disabled }) {
   );
 }
 
+// ============================================================================
+// EFFECTS TAB
+// ============================================================================
+
+const EFFECT_DEFAULTS = [
+  { id: "lightning",  enabled: false, color: "#a78bfa", opacity: 85, speed: 5,  bolts: 3,   jitter: 8   },
+  { id: "soundwaves", enabled: false, color: "#38bdf8", opacity: 45, speed: 4,  count: 4,   strokeWidth: 1.5 },
+  { id: "particles",  enabled: false, color: "#f472b6", opacity: 70, speed: 3,  count: 15,  size: 3     },
+  { id: "scanlines",  enabled: false, color: "#ffffff", opacity: 18, speed: 3,  lineGap: 4, beamHeight: 36  },
+  { id: "shimmer",    enabled: false, color: "#ffffff", opacity: 55, speed: 3,  beamWidth: 100 },
+  { id: "pulserings", enabled: false, color: "#818cf8", opacity: 60, speed: 3,  count: 3,   strokeWidth: 1.5 },
+  { id: "matrixrain", enabled: false, color: "#4ade80", opacity: 55, speed: 5,  columns: 12, dotSize: 3  },
+];
+
+const EFFECT_META = [
+  {
+    id: "lightning",
+    label: "⚡ Lightning",
+    desc: "Zigzag bolts flicker along the banner edges",
+    controls: [
+      { key: "bolts",  label: "Bolts",  type: "int",   min: 1, max: 6,  step: 1 },
+      { key: "jitter", label: "Jitter", type: "float", min: 2, max: 20, step: 1, fmt: v => `${v}px` },
+    ],
+  },
+  {
+    id: "soundwaves",
+    label: "〜 Sound Waves",
+    desc: "Sine waves ripple horizontally across the banner",
+    controls: [
+      { key: "count",       label: "Waves",     type: "int",   min: 1, max: 8,  step: 1 },
+      { key: "strokeWidth", label: "Thickness", type: "float", min: 0.5, max: 4, step: 0.5, fmt: v => `${v}px` },
+    ],
+  },
+  {
+    id: "particles",
+    label: "✦ Particles",
+    desc: "Glowing sparks drift upward and fade out",
+    controls: [
+      { key: "count", label: "Count", type: "int",   min: 3, max: 40, step: 1 },
+      { key: "size",  label: "Size",  type: "float", min: 1, max: 10, step: 0.5, fmt: v => `${v}px` },
+    ],
+  },
+  {
+    id: "scanlines",
+    label: "📺 Scanlines",
+    desc: "CRT grid with a glowing beam sweeping top to bottom",
+    controls: [
+      { key: "lineGap",    label: "Line gap",    type: "int", min: 2, max: 20, step: 1, fmt: v => `${v}px` },
+      { key: "beamHeight", label: "Beam height", type: "int", min: 8, max: 100, step: 4, fmt: v => `${v}px` },
+    ],
+  },
+  {
+    id: "shimmer",
+    label: "✨ Shimmer",
+    desc: "Diagonal gloss highlight sweeps across the banner",
+    controls: [
+      { key: "beamWidth", label: "Beam width", type: "int", min: 20, max: 300, step: 10, fmt: v => `${v}px` },
+    ],
+  },
+  {
+    id: "pulserings",
+    label: "◎ Pulse Rings",
+    desc: "Rings expand outward from the center and fade",
+    controls: [
+      { key: "count",       label: "Rings",     type: "int",   min: 1, max: 8,  step: 1 },
+      { key: "strokeWidth", label: "Thickness", type: "float", min: 0.5, max: 4, step: 0.5, fmt: v => `${v}px` },
+    ],
+  },
+  {
+    id: "matrixrain",
+    label: "⬇ Matrix Rain",
+    desc: "Columns of glowing dots rain downward",
+    controls: [
+      { key: "columns", label: "Columns",  type: "int",   min: 3, max: 30, step: 1 },
+      { key: "dotSize", label: "Dot size", type: "float", min: 1, max: 8,  step: 0.5, fmt: v => `${v}px` },
+    ],
+  },
+];
+
+function EffectCard({ meta, eff, onChange }) {
+  const [open, setOpen] = useState(false);
+  const patch = (updates) => onChange({ ...eff, ...updates });
+
+  return (
+    <div className={"eff-card" + (eff.enabled ? " eff-on" : "")}>
+      <div className="eff-header">
+        <label className="eff-toggle-row">
+          <input
+            type="checkbox"
+            checked={eff.enabled}
+            onChange={e => patch({ enabled: e.target.checked })}
+          />
+          <span className="eff-label">{meta.label}</span>
+        </label>
+        <button
+          type="button"
+          className={"eff-chevron" + (open ? " open" : "")}
+          onClick={() => setOpen(o => !o)}
+          aria-label={open ? "Collapse" : "Expand"}
+        >
+          ›
+        </button>
+      </div>
+
+      {!open && <p className="eff-desc">{meta.desc}</p>}
+
+      {open && (
+        <div className="eff-controls">
+          {/* Colour */}
+          <div className="eff-row">
+            <span className="eff-row-label">Colour</span>
+            <input
+              type="color"
+              className="eff-swatch"
+              value={eff.color}
+              onChange={e => patch({ color: e.target.value })}
+            />
+          </div>
+          {/* Opacity */}
+          <div className="eff-row">
+            <span className="eff-row-label">Opacity</span>
+            <input type="range" min={5} max={100} step={5} value={eff.opacity}
+              onChange={e => patch({ opacity: Number(e.target.value) })} />
+            <em className="eff-val">{eff.opacity}%</em>
+          </div>
+          {/* Speed */}
+          <div className="eff-row">
+            <span className="eff-row-label">Speed</span>
+            <input type="range" min={1} max={10} step={1} value={eff.speed}
+              onChange={e => patch({ speed: Number(e.target.value) })} />
+            <em className="eff-val">{eff.speed}</em>
+          </div>
+          {/* Effect-specific sliders */}
+          {meta.controls.map(ctrl => {
+            const val = eff[ctrl.key] ?? 0;
+            const display = ctrl.fmt ? ctrl.fmt(val) : val;
+            const parse = ctrl.type === "int"
+              ? e => patch({ [ctrl.key]: parseInt(e.target.value, 10) })
+              : e => patch({ [ctrl.key]: parseFloat(e.target.value) });
+            return (
+              <div className="eff-row" key={ctrl.key}>
+                <span className="eff-row-label">{ctrl.label}</span>
+                <input type="range" min={ctrl.min} max={ctrl.max} step={ctrl.step} value={val}
+                  onChange={parse} />
+                <em className="eff-val">{display}</em>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EffectsTab({ effects, onChange }) {
+  const update = (id, updated) => onChange(effects.map(e => e.id === id ? updated : e));
+  const activeCount = effects.filter(e => e.enabled).length;
+
+  return (
+    <div>
+      <p className="eff-hint">
+        {activeCount === 0
+          ? "Enable effects to layer atmosphere onto your banner. They stack freely."
+          : `${activeCount} effect${activeCount > 1 ? "s" : ""} active — expand any card to tune it.`}
+      </p>
+      <div className="eff-list">
+        {EFFECT_META.map(meta => {
+          const eff = effects.find(e => e.id === meta.id) || EFFECT_DEFAULTS.find(d => d.id === meta.id);
+          return (
+            <EffectCard
+              key={meta.id}
+              meta={meta}
+              eff={eff}
+              onChange={updated => update(meta.id, updated)}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [theme, setTheme] = useState("dark");
   const [tab, setTab] = useState("text");
@@ -416,6 +598,7 @@ export default function App() {
     autoHeight: true,
     bannerHeight: 120,
     linkUrl: "",
+    effects: EFFECT_DEFAULTS,
   });
 
   useEffect(() => {
@@ -593,6 +776,11 @@ export default function App() {
                 onClick={() => setTab(t.id)}
               >
                 {t.label}
+                {t.id === "effects" && config.effects.filter(e => e.enabled).length > 0 && (
+                  <span className="tab-badge">
+                    {config.effects.filter(e => e.enabled).length}
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -832,7 +1020,10 @@ export default function App() {
             )}
 
             {tab === "effects" && (
-              <div className="empty-tab">More effects coming soon.</div>
+              <EffectsTab
+                effects={config.effects}
+                onChange={effects => setConfig(c => ({ ...c, effects }))}
+              />
             )}
           </div>
         </aside>

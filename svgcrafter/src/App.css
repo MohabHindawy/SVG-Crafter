@@ -336,3 +336,103 @@ input:disabled { opacity: 0.45; cursor: not-allowed; }
 .guide li { font-size: 13px; color: var(--text); line-height: 1.5; }
 .guide li b { color: var(--accent); font-weight: 700; }
 .guide li code { color: var(--text); background: var(--panel-2); padding: 1px 6px; border-radius: 5px; font-family: var(--font-body); }
+/* ============================================================================
+   EFFECTS TAB
+   ============================================================================ */
+
+.eff-hint {
+  font-size: 12px; font-weight: 600; color: var(--muted);
+  background: var(--check); border: 1px solid var(--border);
+  border-radius: 8px; padding: 9px 12px; margin: 0 0 14px;
+  line-height: 1.5;
+}
+
+.eff-list { display: flex; flex-direction: column; gap: 8px; }
+
+/* Card */
+.eff-card {
+  border: 1px solid var(--border); border-radius: 12px;
+  background: var(--panel-2); overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.eff-card.eff-on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 2px 16px rgba(139,124,255,0.10);
+}
+
+/* Header row: checkbox + label + chevron */
+.eff-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 11px 12px 9px;
+}
+.eff-toggle-row {
+  display: flex; align-items: center; gap: 8px;
+  flex: 1; min-width: 0; cursor: pointer;
+}
+.eff-toggle-row input[type="checkbox"] {
+  width: 15px; height: 15px; flex: none;
+  accent-color: var(--accent); cursor: pointer;
+}
+.eff-label {
+  font-size: 13px; font-weight: 700; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: color 0.15s;
+}
+.eff-on .eff-label { color: var(--accent); }
+
+/* Expand/collapse chevron */
+.eff-chevron {
+  width: 26px; height: 26px; flex: none;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 7px;
+  color: var(--muted); font-size: 16px; line-height: 1;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: color 0.15s, border-color 0.15s, transform 0.18s;
+  padding-bottom: 1px;
+}
+.eff-chevron:hover { color: var(--accent); border-color: var(--accent); }
+.eff-chevron.open { transform: rotate(90deg); color: var(--accent); border-color: var(--accent); }
+
+/* Description shown when collapsed */
+.eff-desc {
+  margin: 0 12px 11px; padding: 0;
+  font-size: 12px; color: var(--muted); line-height: 1.45;
+}
+
+/* Controls panel (expanded) */
+.eff-controls {
+  border-top: 1px solid var(--border);
+  padding: 12px 12px 12px;
+  display: flex; flex-direction: column; gap: 9px;
+}
+
+/* Each control row: label | slider | value */
+.eff-row {
+  display: flex; align-items: center; gap: 8px;
+}
+.eff-row-label {
+  font-size: 12px; font-weight: 600; color: var(--muted);
+  width: 68px; flex: none; white-space: nowrap;
+}
+.eff-row input[type="range"] {
+  flex: 1; accent-color: var(--accent); cursor: pointer;
+}
+.eff-val {
+  font-style: normal; font-size: 11px; font-weight: 600; color: var(--muted);
+  width: 38px; text-align: right; flex: none;
+}
+
+/* Colour swatch */
+input[type="color"].eff-swatch {
+  width: 36px; height: 26px; flex: none;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 7px; padding: 2px; cursor: pointer;
+}
+
+/* Badge on Effects tab showing active count */
+.tab-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; border-radius: 50%; margin-left: 5px;
+  background: var(--accent); color: var(--on-accent);
+  font-size: 9px; font-weight: 800; vertical-align: middle;
+  line-height: 1;
+}
