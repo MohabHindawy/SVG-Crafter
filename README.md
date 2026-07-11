@@ -5,7 +5,7 @@ A frontend-only tool for building animated, custom SVG banners for your GitHub p
 GitHub’s image proxy (camo) makes it difficult to get fonts and animations working in READMEs. SVG Crafter handles the messy parts like embedding Google Fonts as Base64 so you can focus on making your profile look good without fighting the proxy.
 
 ## Examples
-Here are a few designs you can easily replicate!
+Here are a few designs you can easily create!
 
 | Terminal | Arcade | Clean |
 | :---: | :---: | :---: |
