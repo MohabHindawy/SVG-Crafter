@@ -468,7 +468,7 @@ const EFFECT_DEFAULTS = [
   { id: "sparkles",   enabled: false, color: "#fde047", opacity: 85, speed: 4,  count: 10,  size: 5 },
   { id: "confetti",   enabled: false, color: "#f472b6", opacity: 90, speed: 4,  count: 18,  size: 5 },
   { id: "aurora",     enabled: false, color: "#22d3ee", opacity: 45, speed: 2,  blobs: 3,   size: 60 },
-  { id: "blurrylights",      enabled: false, color: "#fbbf24", opacity: 45, speed: 2,  count: 10,  size: 10 },
+  { id: "bokeh",      enabled: false, color: "#fbbf24", opacity: 45, speed: 2,  count: 10,  size: 10 },
   { id: "synthgrid",  enabled: false, color: "#ff2d95", opacity: 55, speed: 4,  columns: 7, rows: 5 },
   { id: "starfield",  enabled: false, color: "#dbeafe", opacity: 70, speed: 5,  count: 18,  streak: 14 },
   { id: "vignette",   enabled: false, color: "#000000", opacity: 60, speed: 5,  flicker: 25 },
@@ -477,7 +477,7 @@ const EFFECT_DEFAULTS = [
 const EFFECT_META = [
   {
     id: "lightning",
-    label: "Lightning",
+    label: "⚡ Lightning",
     desc: "Zigzag bolts flicker along the banner edges",
     controls: [
       { key: "bolts",  label: "Bolts",  type: "int",   min: 1, max: 6,  step: 1 },
@@ -486,7 +486,7 @@ const EFFECT_META = [
   },
   {
     id: "soundwaves",
-    label: "Sound Waves",
+    label: "〜 Sound Waves",
     desc: "Sine waves ripple horizontally across the banner",
     controls: [
       { key: "count",       label: "Waves",     type: "int",   min: 1, max: 8,  step: 1 },
@@ -495,7 +495,7 @@ const EFFECT_META = [
   },
   {
     id: "particles",
-    label: "Particles",
+    label: "✦ Particles",
     desc: "Glowing sparks drift upward and fade out",
     controls: [
       { key: "count", label: "Count", type: "int",   min: 3, max: 40, step: 1 },
@@ -504,7 +504,7 @@ const EFFECT_META = [
   },
   {
     id: "scanlines",
-    label: "Scanlines",
+    label: "📺 Scanlines",
     desc: "CRT grid with a glowing beam sweeping top to bottom",
     controls: [
       { key: "lineGap",    label: "Line gap",    type: "int", min: 2, max: 20, step: 1, fmt: v => `${v}px` },
@@ -513,7 +513,7 @@ const EFFECT_META = [
   },
   {
     id: "shimmer",
-    label: "Shimmer",
+    label: "✨ Shimmer",
     desc: "Diagonal gloss highlight sweeps across the banner",
     controls: [
       { key: "beamWidth", label: "Beam width", type: "int", min: 20, max: 300, step: 10, fmt: v => `${v}px` },
@@ -521,7 +521,7 @@ const EFFECT_META = [
   },
   {
     id: "pulserings",
-    label: "Pulse Rings",
+    label: "◎ Pulse Rings",
     desc: "Rings expand outward from the center and fade",
     controls: [
       { key: "count",       label: "Rings",     type: "int",   min: 1, max: 8,  step: 1 },
@@ -530,7 +530,7 @@ const EFFECT_META = [
   },
   {
     id: "matrixrain",
-    label: "Matrix Rain",
+    label: "⬇ Matrix Rain",
     desc: "Columns of glowing dots rain downward",
     controls: [
       { key: "columns", label: "Columns",  type: "int",   min: 3, max: 30, step: 1 },
@@ -539,7 +539,7 @@ const EFFECT_META = [
   },
   {
     id: "borderbeam",
-    label: "Border Beam",
+    label: "◉ Border Beam",
     desc: "Glowing comets orbit around the banner's border",
     controls: [
       { key: "count",      label: "Comets",    type: "int",   min: 1, max: 4,  step: 1 },
@@ -549,7 +549,7 @@ const EFFECT_META = [
   },
   {
     id: "sparkles",
-    label: "Sparkles",
+    label: "✧ Sparkles",
     desc: "Four-point stars twinkle in and out across the banner",
     controls: [
       { key: "count", label: "Count", type: "int",   min: 3, max: 30, step: 1 },
@@ -558,7 +558,7 @@ const EFFECT_META = [
   },
   {
     id: "confetti",
-    label: "Confetti",
+    label: "🎊 Confetti",
     desc: "Colourful pieces tumble down, hues derived from your colour",
     controls: [
       { key: "count", label: "Count", type: "int",   min: 5, max: 40, step: 1 },
@@ -567,7 +567,7 @@ const EFFECT_META = [
   },
   {
     id: "aurora",
-    label: "Aurora",
+    label: "≋ Aurora",
     desc: "Soft blurred colour blobs drift slowly behind the text",
     controls: [
       { key: "blobs", label: "Blobs", type: "int", min: 1, max: 4,   step: 1 },
@@ -575,8 +575,8 @@ const EFFECT_META = [
     ],
   },
   {
-    id: "blurrylights",
-    label: "Blurry Lights",
+    id: "bokeh",
+    label: "○ Bokeh",
     desc: "Soft out-of-focus orbs drift slowly upward",
     controls: [
       { key: "count", label: "Orbs", type: "int", min: 3, max: 25, step: 1 },
@@ -585,7 +585,7 @@ const EFFECT_META = [
   },
   {
     id: "synthgrid",
-    label: "Synthwave Grid",
+    label: "▦ Synthwave Grid",
     desc: "Retro 3D wireframe floor scrolls toward the viewer",
     controls: [
       { key: "columns", label: "Columns", type: "int", min: 3, max: 12, step: 1 },
@@ -594,7 +594,7 @@ const EFFECT_META = [
   },
   {
     id: "starfield",
-    label: "Starfield",
+    label: "✵ Starfield",
     desc: "Hyperspace streaks shoot from the centre outward",
     controls: [
       { key: "count",  label: "Streaks", type: "int", min: 6, max: 40, step: 1 },
@@ -603,7 +603,7 @@ const EFFECT_META = [
   },
   {
     id: "vignette",
-    label: "CRT Vignette",
+    label: "◐ CRT Vignette",
     desc: "Edges darken with a subtle CRT flicker — pairs with scanlines",
     controls: [
       { key: "flicker", label: "Flicker", type: "int", min: 0, max: 100, step: 5, fmt: v => `${v}%` },
@@ -688,7 +688,7 @@ function EffectCard({ meta, eff, onChange }) {
 
 // Effects grouped by visual family so the 11 cards aren't one long scroll.
 const EFFECT_GROUPS = [
-  { title: "Ambient",  ids: ["aurora", "blurrylights", "shimmer", "scanlines", "vignette", "sparkles"] },
+  { title: "Ambient",  ids: ["aurora", "bokeh", "shimmer", "scanlines", "vignette", "sparkles"] },
   { title: "Motion",   ids: ["particles", "confetti", "matrixrain", "soundwaves", "synthgrid", "starfield"] },
   { title: "Accent",   ids: ["lightning", "pulserings", "borderbeam"] },
 ];
@@ -730,42 +730,406 @@ function EffectsTab({ effects, onChange }) {
   );
 }
 
+// ============================================================================
+// IMPORT / EXPORT (config round-tripping)
+// ============================================================================
+
+const defaultConfig = () => ({
+  sentences: ["Welcome 👋", "SVG Crafter"],
+  sentenceAligns: ["left", "left"],
+  sentenceMotions: ["none", "none"],
+  sentenceIds: [uid(), uid()],
+  motionSpeed: 1,
+  fontSize: 40,
+  fontWeight: 700,
+  fontId: "sans",
+  googleFont: "",
+  embedFont: null,
+  transition: "typing",
+  transitionDuration: 0.6,
+  typingMode: "smooth",
+  typingSpeed: 1,
+  cursor: true,
+  holdDuration: 1.5,
+  textPaint: gradientPaint("#41d1ff", "#bd34fe", 0),
+  border: false,
+  borderWidth: 2,
+  borderRadius: 14,
+  borderPaint: gradientPaint("#41d1ff", "#bd34fe", 0),
+  bgPaint: solidPaint("#14142b"),
+  glow: false,
+  autoWidth: true,
+  bannerWidth: 600,
+  autoHeight: true,
+  bannerHeight: 120,
+  linkUrl: "",
+  effects: EFFECT_DEFAULTS,
+});
+
+// Unicode-safe base64 (chunked — avoids call-stack limits on long strings).
+const b64encode = (str) => {
+  const bytes = new TextEncoder().encode(str);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+};
+const b64decode = (b64) => {
+  const bin = atob(b64);
+  const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+};
+
+const META_RE = /<metadata id="svgcrafter-config">([A-Za-z0-9+/=]+)<\/metadata>/;
+
+// Injects the raw app config into the exported SVG as base64 JSON inside a
+// <metadata> element — standard SVG, ignored by every renderer (incl. GitHub's
+// camo proxy), and makes re-import lossless. embedFont is stripped: it's large
+// (base64 woff2) and the app re-fetches it from `googleFont` on import anyway.
+function embedConfig(svg, config) {
+  const rest = { ...config };
+  delete rest.embedFont;
+  const meta = `<metadata id="svgcrafter-config">${b64encode(JSON.stringify(rest))}</metadata>`;
+  const at = svg.indexOf(">") + 1; // right after the opening <svg …> tag
+  return svg.slice(0, at) + meta + svg.slice(at);
+}
+
+// Merges an imported config over fresh defaults so files exported by older or
+// newer app versions still load: missing keys get defaults, the four parallel
+// sentence arrays are re-synced, sentence ids are regenerated, and the effects
+// list is merged with EFFECT_DEFAULTS by id (old exports gain new effects).
+function sanitizeConfig(raw) {
+  const base = defaultConfig();
+  const cfg = { ...base, ...raw, embedFont: null };
+
+  const sentences = (Array.isArray(cfg.sentences) ? cfg.sentences : base.sentences)
+    .slice(0, 6).map((t) => String(t ?? ""));
+  if (!sentences.length) sentences.push("");
+  const syncArr = (arr, fill) =>
+    sentences.map((_, i) => (Array.isArray(arr) && arr[i] != null ? arr[i] : fill));
+  cfg.sentences = sentences;
+  cfg.sentenceAligns = syncArr(cfg.sentenceAligns, "left");
+  cfg.sentenceMotions = syncArr(cfg.sentenceMotions, "none");
+  cfg.sentenceIds = sentences.map(() => uid());
+
+  const imported = Array.isArray(cfg.effects) ? cfg.effects : [];
+  cfg.effects = EFFECT_DEFAULTS.map((d) => {
+    const found = imported.find((e) => e && e.id === d.id);
+    return found ? { ...d, ...found } : d;
+  });
+
+  return cfg;
+}
+
+// Legacy import: SVG Crafter exports made before config metadata existed.
+// The generator is deterministic, so the config can be reverse-engineered from
+// the markup itself. Recovers: dimensions, sentences, font (size/weight/family,
+// Google Fonts re-fetched by name), text/background/border paints (solid or
+// gradient with stops, angle, and move/rotate animation), border width/radius,
+// glow, transition kind + hold/transition durations, typing mode + cursor,
+// per-sentence motion presets, alignment (nearest-match via re-measured text
+// widths), and which effects were enabled + their colours. Not recoverable:
+// link URL, paint brightness, effect fine-tuning (speeds/counts/sizes) — those
+// fall back to defaults.
+const LEGACY_EFFECT_MARKERS = {
+  ltClip: "lightning", swClip: "soundwaves", ptClip: "particles", scClip: "scanlines",
+  shimClip: "shimmer", prClip: "pulserings", mrClip: "matrixrain", bbClip: "borderbeam",
+  spClip: "sparkles", cfClip: "confetti", auClip: "aurora", bkClip: "bokeh",
+  sgClip: "synthgrid", stClip: "starfield", vgGrad: "vignette",
+};
+
+function parseLegacySvg(root, cssText) {
+  const clampN = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+  const texts = [...root.querySelectorAll("text")];
+  const isOurs =
+    root.querySelector('[id="textPaint"],[id="bgPaint"],[id="borderPaint"]') ||
+    texts.some((t) => (t.getAttribute("class") || "").includes("tt")) ||
+    root.querySelector('clipPath[id^="clip"] rect > animate[attributeName="width"]') ||
+    Object.keys(LEGACY_EFFECT_MARKERS).some((id) => root.querySelector(`[id="${id}"]`));
+  if (!isOurs || !texts.length) return null;
+
+  const cfg = defaultConfig();
+  const notes = [];
+  // Each stage runs isolated: an unexpected structure (e.g. a file from an
+  // older generator version) degrades that one field to defaults instead of
+  // aborting the whole legacy parse and losing everything.
+  const stage = (name, fn) => { try { fn(); } catch { notes.push(name); } };
+
+  // ---- dimensions -----------------------------------------------------------
+  const W = Number(root.getAttribute("width"));
+  const H = Number(root.getAttribute("height"));
+  if (W > 0) { cfg.autoWidth = false; cfg.bannerWidth = Math.round(W); }
+  if (H > 0) { cfg.autoHeight = false; cfg.bannerHeight = Math.round(H); }
+
+  // ---- paint recovery (solid hex or gradient def) ---------------------------
+  const parsePaint = (val, opacityAttr) => {
+    if (!val || val === "none") return null;
+    const ref = val.match(/url\(#(.+?)\)/);
+    if (!ref) {
+      const p = solidPaint(val);
+      p.opacity = Math.round(Number(opacityAttr ?? 1) * 100);
+      return p;
+    }
+    const grad = root.querySelector(`[id="${ref[1]}"]`);
+    if (!grad) return solidPaint("#ffffff");
+    const stops = [...grad.querySelectorAll("stop")].map((st) => ({
+      id: uid(),
+      color: st.getAttribute("stop-color") || "#ffffff",
+      opacity: Math.round(Number(st.getAttribute("stop-opacity") ?? 1) * 100),
+      brightness: 100,
+    }));
+    const g = (a) => Number(grad.getAttribute(a)) || 0;
+    const angle = Math.round(((Math.atan2(g("y2") - g("y1"), g("x2") - g("x1")) * 180) / Math.PI + 360) % 360);
+    let anim = "none", animSpeed = 3, animReverse = false;
+    const at = grad.querySelector("animateTransform");
+    if (at) {
+      const dur = parseFloat(at.getAttribute("dur")) || 12;
+      if (at.getAttribute("type") === "rotate") {
+        anim = "rotate";
+        animSpeed = clampN(Math.round(24 / dur), 1, 10);
+        animReverse = (at.getAttribute("from") || "").startsWith("360");
+      } else {
+        anim = "move";
+        animSpeed = clampN(Math.round(36 / dur), 1, 10);
+        const [tx, ty] = (at.getAttribute("to") || "0 0").split(/\s+/).map(Number);
+        const ex = 2 * (g("x2") - g("x1")), ey = 2 * (g("y2") - g("y1"));
+        animReverse = Math.abs(ex) > 1e-6 ? Math.sign(tx) !== Math.sign(ex) : Math.sign(ty) !== Math.sign(ey);
+      }
+    }
+    return { type: "gradient", color: stops[0]?.color || "#ffffff", opacity: 100,
+      brightness: 100, angle, anim, animSpeed, animReverse, stops };
+  };
+
+  // ---- background / border (the main rect) ----------------------------------
+  stage("background", () => {
+    const mainRect =
+      [...root.children].find((el) =>
+        el.tagName === "rect" && !el.hasAttribute("pathLength") &&
+        el.getAttribute("fill") && el.getAttribute("fill") !== "none") ||
+      root.querySelector('rect[fill="url(#bgPaint)"]');
+    if (!mainRect) return;
+    cfg.bgPaint = parsePaint(mainRect.getAttribute("fill"), mainRect.getAttribute("fill-opacity")) || cfg.bgPaint;
+    cfg.borderRadius = Math.round(Number(mainRect.getAttribute("rx")) || 0);
+    const stroke = mainRect.getAttribute("stroke");
+    if (stroke && stroke !== "none") {
+      cfg.border = true;
+      cfg.borderWidth = Number(mainRect.getAttribute("stroke-width")) || 2;
+      cfg.borderPaint = parsePaint(stroke, mainRect.getAttribute("stroke-opacity")) || cfg.borderPaint;
+    }
+  });
+
+  // ---- text: sentences, font, paint, glow ------------------------------------
+  cfg.sentences = texts.map((t) => t.textContent).slice(0, 6);
+  const t0 = texts[0];
+  let familyStr = FONTS[0].stack;
+  stage("text style", () => {
+    cfg.fontSize = Number(t0.getAttribute("font-size")) || cfg.fontSize;
+    cfg.fontWeight = Number(t0.getAttribute("font-weight")) || cfg.fontWeight;
+    cfg.glow = (t0.getAttribute("filter") || "").includes("glow");
+    cfg.textPaint = parsePaint(t0.getAttribute("fill"), t0.getAttribute("fill-opacity")) || cfg.textPaint;
+
+    const famAttr = t0.getAttribute("font-family") || "";
+    const sysMatch = FONTS.find((f) => f.stack === famAttr);
+    if (sysMatch) {
+      cfg.fontId = sysMatch.id;
+      familyStr = sysMatch.stack;
+    } else {
+      const fam = famAttr.match(/^'([^']+)'/);
+      if (fam && !FONTS.some((f) => f.stack.includes(fam[1]))) {
+        cfg.googleFont = fam[1];   // triggers the existing auto-refetch effect
+        cfg.fontId = "custom";
+      }
+    }
+  });
+
+  // ---- transition ------------------------------------------------------------
+  stage("transition", () => {
+  const typingClip = root.querySelector('clipPath[id^="clip"] rect > animate[attributeName="width"]');
+  if (typingClip) {
+    cfg.transition = "typing";
+    cfg.typingMode = typingClip.getAttribute("calcMode") === "discrete" ? "char" : "smooth";
+    cfg.cursor = !!root.querySelector(".cursor");
+  } else {
+    const tkf = cssText.match(/@keyframes tkf0 \{([^}]*(?:\}[^}]*)*?)\}\s*(?=@keyframes|\.tt|$)/);
+    const animDur = cssText.match(/animation:\s*tkf0\s+([\d.]+)s/);
+    if (tkf && animDur) {
+      const body = tkf[1];
+      cfg.transition =
+        body.includes("blur(") ? "blur" :
+        body.includes("scale(") ? "zoom" :
+        body.includes("translateX(") ? "slide" :
+        body.includes("translateY(") ? "rise" : "fade";
+      const T = parseFloat(animDur[1]);
+      const N = (cssText.match(/@keyframes tkf\d+/g) || []).length || 1;
+      const pcts = [...body.matchAll(/([\d.]+)%/g)].map((m) => parseFloat(m[1])).filter((p) => p > 0);
+      if (pcts.length) {
+        const trans = Math.round(((Math.min(...pcts) / 100) * T) * 10) / 10;
+        if (trans < 0.1) cfg.transition = "none";
+        cfg.transitionDuration = clampN(trans, 0.2, 1.5);
+        cfg.holdDuration = clampN(Math.round((T / N - trans) * 2) / 2, 0.5, 5);
+      }
+    } else if (texts.length === 1) {
+      cfg.transition = "none";
+    }
+  }
+  });
+
+  // ---- per-sentence motion + alignment ---------------------------------------
+  stage("text motion", () => {
+  cfg.sentenceMotions = texts.map((t) => {
+    const wrap = t.closest("g[class^=mv]");
+    if (!wrap) return "none";
+    const kf = cssText.match(new RegExp(`@keyframes ${wrap.getAttribute("class")}\\{([^}]*(?:\\}[^}]*)*?)\\}\\.`));
+    const body = kf ? kf[1] : "";
+    if (body.includes("rotate(")) return "wobble";
+    if (body.includes("scale(")) return "pulse";
+    if (body.includes("translateX(")) return "sway";
+    if (body.includes("translateY(")) return "bob";
+    if (body.includes("translate(")) return body.startsWith("0%{transform:translate(0,0)") ? "float" : "orbit";
+    return "none";
+  });
+  });
+
+  const PAD = 28;
+  stage("alignment", () => {
+  cfg.sentenceAligns = texts.map((t, i) => {
+    if (t.hasAttribute("textLength")) return "justify";
+    const x = Number(t.getAttribute("x")) || PAD;
+    const w = measureSentence(cfg.sentences[i], cfg.fontSize, cfg.fontWeight, familyStr).width;
+    const candidates = { left: PAD, center: (W - w) / 2, right: W - PAD - w };
+    return Object.entries(candidates).sort((a, b) => Math.abs(a[1] - x) - Math.abs(b[1] - x))[0][0];
+  });
+  });
+  cfg.sentenceIds = cfg.sentences.map(() => uid());
+
+  // ---- effects: detect by marker id, recover colour + parameters --------------
+  cfg.effects = EFFECT_DEFAULTS.map((d) => {
+    const marker = Object.keys(LEGACY_EFFECT_MARKERS).find((k) => LEGACY_EFFECT_MARKERS[k] === d.id);
+    let node = marker && root.querySelector(`[id="${marker}"]`);
+    // Pre-session exports had no bbClip — detect old borderbeam structurally.
+    if (!node && d.id === "borderbeam") node = root.querySelector("rect[pathLength]");
+    if (!node) return d;
+    const eff = { ...d, enabled: true };
+    try {
+      const grp = root.querySelector(`g[clip-path="url(#${marker})"]`);
+      if (d.id === "vignette") {
+        const stop = node.querySelectorAll("stop")[2];
+        if (stop) eff.color = stop.getAttribute("stop-color") || eff.color;
+        eff.flicker = root.querySelector('rect[fill="url(#vgGrad)"] > animate') ? eff.flicker : 0;
+        return eff;
+      }
+      if (!grp && d.id !== "borderbeam") return eff;
+      const el = grp && grp.querySelector("[fill]:not([fill='none']), [stroke]");
+      if (el) eff.color = el.getAttribute("fill") && el.getAttribute("fill") !== "none"
+        ? el.getAttribute("fill") : (el.getAttribute("stroke") || eff.color);
+
+      const num = (v) => Number(v) || 0;
+      switch (d.id) {
+        case "borderbeam": {
+          // Layers are rects with pathLength — works for both the old 3-layer
+          // and new 5-layer formats. Comet count from the dash period, tail
+          // from the longest dash, thickness from the narrowest stroke (the
+          // glow underlay is thick × 2.4–2.6), colour from a non-brightened
+          // layer, speed from the shared duration (dur = 24 / speed).
+          const layers = [...(grp || root).querySelectorAll("rect[pathLength]")]
+            .map((r) => {
+              const [on, gap] = (r.getAttribute("stroke-dasharray") || "0 0").split(/\s+/).map(Number);
+              return { on, gap, w: num(r.getAttribute("stroke-width")),
+                stroke: r.getAttribute("stroke"),
+                dur: parseFloat(r.querySelector("animate")?.getAttribute("dur")) || 6 };
+            })
+            .filter((l) => l.on > 0);
+          if (layers.length) {
+            eff.count = Math.max(1, Math.min(4, Math.round(100 / (layers[0].on + layers[0].gap))));
+            eff.tailLength = Math.round(Math.max(...layers.map((l) => l.on)));
+            eff.thickness = Math.min(...layers.map((l) => l.w));
+            eff.color = layers[0].stroke || eff.color;   // widest/glow layer = base colour
+            eff.speed = Math.max(1, Math.min(10, Math.round(24 / layers[0].dur)));
+          }
+          break;
+        }
+        case "soundwaves": {
+          const paths = grp.querySelectorAll("path");
+          eff.count = paths.length || eff.count;
+          eff.strokeWidth = num(paths[0]?.getAttribute("stroke-width")) || eff.strokeWidth;
+          break;
+        }
+        case "pulserings": {
+          const rings = grp.querySelectorAll("ellipse, circle");
+          eff.count = rings.length || eff.count;
+          eff.strokeWidth = num(rings[0]?.getAttribute("stroke-width")) || eff.strokeWidth;
+          break;
+        }
+        case "particles": case "bokeh":
+          eff.count = grp.querySelectorAll("circle").length || eff.count; break;
+        case "sparkles":
+          eff.count = grp.querySelectorAll("path").length || eff.count; break;
+        case "confetti":
+          eff.count = grp.querySelectorAll("rect").length || eff.count; break;
+        case "starfield":
+          eff.count = grp.querySelectorAll("line").length || eff.count; break;
+        case "aurora":
+          eff.blobs = grp.querySelectorAll("ellipse").length || eff.blobs; break;
+        case "synthgrid": {
+          const lines = [...grp.querySelectorAll("line")];
+          const scrolling = lines.filter((l) => l.querySelector("animate")).length;
+          if (scrolling) eff.rows = scrolling;
+          const statics = lines.length - scrolling - 1;   // minus horizon line
+          if (statics > 0) eff.columns = Math.round(statics / 2);
+          break;
+        }
+      }
+    } catch { notes.push(d.id); }
+    return eff;
+  });
+
+  return cfg;
+}
+
+// Import path, in order of fidelity: (1) metadata block → lossless, (2) legacy
+// SVG Crafter export → reverse-engineered from markup, (3) anything else →
+// best-effort text + dimensions so foreign SVGs still open.
+function parseImportedSvg(text) {
+  const m = text.match(META_RE);
+  if (m) {
+    try {
+      return { config: sanitizeConfig(JSON.parse(b64decode(m[1]))), foreign: false };
+    } catch { /* corrupted metadata → fall through */ }
+  }
+
+  const doc = new DOMParser().parseFromString(text, "image/svg+xml");
+  const root = doc.querySelector("svg");
+  if (!root || doc.querySelector("parsererror")) return null;
+
+  try {
+    const cssText = [...root.querySelectorAll("style")].map((st) => st.textContent).join("\n");
+    const legacy = parseLegacySvg(root, cssText);
+    if (legacy) return { config: sanitizeConfig(legacy), foreign: false, legacy: true };
+  } catch { /* malformed legacy file → fall through to foreign parse */ }
+
+  const cfg = defaultConfig();
+  const texts = [...root.querySelectorAll("text")]
+    .map((t) => t.textContent.trim()).filter(Boolean).slice(0, 6);
+  if (texts.length) {
+    cfg.sentences = texts;
+    cfg.sentenceAligns = texts.map(() => "left");
+    cfg.sentenceMotions = texts.map(() => "none");
+    cfg.sentenceIds = texts.map(() => uid());
+  }
+  const vb = (root.getAttribute("viewBox") || "").split(/[\s,]+/).map(Number);
+  const w = Number(root.getAttribute("width")) || vb[2];
+  const h = Number(root.getAttribute("height")) || vb[3];
+  if (w > 0) { cfg.autoWidth = false; cfg.bannerWidth = Math.round(w); }
+  if (h > 0) { cfg.autoHeight = false; cfg.bannerHeight = Math.round(h); }
+  return { config: cfg, foreign: true };
+}
+
 export default function App() {
   const [tab, setTab] = useState("text");
   const [copied, setCopied] = useState("");
   const [fileName, setFileName] = useState("banner");
   const [dragSentence, setDragSentence] = useState(null);
-  const [config, setConfig] = useState({
-    sentences: ["Welcome 👋", "SVG Crafter"],
-    sentenceAligns: ["left", "left"],
-    sentenceMotions: ["none", "none"],
-    sentenceIds: [uid(), uid()],
-    motionSpeed: 1,
-    fontSize: 40,
-    fontWeight: 700,
-    fontId: "sans",
-    googleFont: "",
-    embedFont: null,
-    transition: "typing",
-    transitionDuration: 0.6,
-    typingMode: "smooth",
-    typingSpeed: 1,
-    cursor: true,
-    holdDuration: 1.5,
-    textPaint: gradientPaint("#41d1ff", "#bd34fe", 0),
-    border: false,
-    borderWidth: 2,
-    borderRadius: 14,
-    borderPaint: gradientPaint("#41d1ff", "#bd34fe", 0),
-    bgPaint: solidPaint("#14142b"),
-    glow: false,
-    autoWidth: true,
-    bannerWidth: 600,
-    autoHeight: true,
-    bannerHeight: 120,
-    linkUrl: "",
-    effects: EFFECT_DEFAULTS,
-  });
+  const [importNote, setImportNote] = useState(null);
+  const [config, setConfig] = useState(defaultConfig);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", "dark");
@@ -922,6 +1286,29 @@ export default function App() {
   const imageMd = `![${alt}](./assets/${safeName}.svg)`;
   const markdown = link ? `[${imageMd}](${link})` : imageMd;
 
+  const exportSvg = useMemo(() => embedConfig(svg, config), [svg, config]);
+
+  function importSvg(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const parsed = parseImportedSvg(String(reader.result));
+      if (!parsed) {
+        setImportNote({ kind: "error", msg: "Couldn't read that file as an SVG." });
+        return;
+      }
+      setConfig(parsed.config);
+      setFileName(file.name.replace(/\.svg$/i, "") || "banner");
+      setImportNote(parsed.foreign
+        ? { kind: "warn", msg: "Imported a non–SVG Crafter file — recovered text and size, everything else uses defaults." }
+        : parsed.legacy
+          ? { kind: "ok", msg: "Older SVG Crafter export imported — settings recovered from the artwork; effect fine-tuning and animation speeds use defaults." }
+          : { kind: "ok", msg: "Banner imported — full settings restored." });
+    };
+    reader.onerror = () => setImportNote({ kind: "error", msg: "Couldn't read that file." });
+    reader.readAsText(file);
+  }
+
   async function copy(value, which) {
     await navigator.clipboard.writeText(value);
     setCopied(which);
@@ -929,7 +1316,7 @@ export default function App() {
   }
 
   function download() {
-    const blob = new Blob([svg], { type: "image/svg+xml" });
+    const blob = new Blob([exportSvg], { type: "image/svg+xml" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -1322,9 +1709,19 @@ export default function App() {
           </label>
 
           <div className="actions">
-            <button onClick={() => copy(svg, "svg")}>{copied === "svg" ? "Copied" : "Copy SVG"}</button>
+            <button onClick={() => copy(exportSvg, "svg")}>{copied === "svg" ? "Copied" : "Copy SVG"}</button>
             <button onClick={download}>Download .svg</button>
+            <label className="import-btn">
+              Import SVG
+              <input
+                type="file"
+                accept=".svg,image/svg+xml"
+                hidden
+                onChange={(e) => { importSvg(e.target.files[0]); e.target.value = ""; }}
+              />
+            </label>
           </div>
+          {importNote && <p className={`import-note ${importNote.kind}`}>{importNote.msg}</p>}
 
           <label className="field">
             <span>Link URL (optional)</span>
