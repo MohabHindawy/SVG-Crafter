@@ -457,7 +457,7 @@ const EFFECT_DEFAULTS = [
   { id: "blurlight",      enabled: false, color: "#fbbf24", opacity: 45, speed: 2,  count: 10,  size: 10 },
   { id: "synthgrid",  enabled: false, color: "#ff2d95", opacity: 55, speed: 4,  columns: 7, rows: 5 },
   { id: "starfield",  enabled: false, color: "#dbeafe", opacity: 70, speed: 5,  count: 18,  streak: 14 },
-  { id: "vignette",   enabled: false, color: "#000000", opacity: 60, speed: 5,  flicker: 25 },
+  { id: "vignette",   enabled: false, color: "#ce3d31", opacity: 60, speed: 5,  flicker: 25 },
 ];
 
 const EFFECT_META = [
