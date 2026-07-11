@@ -1,86 +1,61 @@
-# SVG Crafter 🎨✨
+# SVG Crafter
 
-SVG Crafter is an entirely client-side web application designed to help developers and designers instantly elevate their GitHub profile pages. Effortlessly create custom, animated, and highly interactive SVG banners that render perfectly anywhere — including behind GitHub's strict anonymous image proxy.
+A frontend-only tool for building animated, custom SVG banners for your GitHub profile. 
 
-## 🚀 Live Showcase
+GitHub’s image proxy (camo) makes it difficult to get fonts and animations working in READMEs. SVG Crafter handles the messy parts like embedding Google Fonts as Base64 so you can focus on making your profile look good without fighting the proxy.
 
-See what you can build with SVG Crafter! Here are a few live examples generated straight from the platform. Drop your exported files into an `assets/` directory in your repository to replicate this visual style:
+## Examples
+Here are a few designs you can easily replicate!
 
-- [Cyberpunk Vibe](#)
-- [Retro Sci-Fi Vibe](#)
-- [Ambient Elegance](#)
+| Terminal | Arcade | Clean |
+| :---: | :---: | :---: |
+| [![Terminal](./assets/terminal.svg)](https://mohabhindawy.github.io/SVG-Crafter/) | [![Arcade](./assets/sci-fi.svg)](https://mohabhindawy.github.io/SVG-Crafter/) | [![Clean](./assets/ambient.svg)](https://mohabhindawy.github.io/SVG-Crafter/) |
 
-To link your banner to a profile or website, the platform automatically generates a clickable markdown wrap. This matters because SVG `<a>` tags are inert once GitHub's camo proxy renders your banner as a plain `<img>` — the link only works because the markdown snippet wraps the image, not because of anything inside the SVG itself.
+*Note: The links only work because the markdown wraps the image; GitHub's proxy strips `<a>` tags inside raw SVG files.*
 
-## 🔥 Key Features
+## What it can do
+- **Multi-Sentence:** Cycles through up to 6 custom text lines.
+- **Animations:** Supports typewriter effects (smooth or character-by-character), plus motion presets like Float, Bob, Sway, and Orbit.
+- **Paint Engine:** Create solid colors or multi-stop gradients with control over opacity, brightness, and basic animation (rotation/movement).
+- **GitHub-Friendly:** It bakes Google Fonts into the SVG markup as Base64 strings. This is the only way to get custom fonts to actually render on GitHub's READMEs.
+- **VFX Layers:** Includes common effects like Scanlines, Matrix Rain, Border Beams, and Aurora glows.
 
-- **Multi-Sentence Cycle Engine**: Input up to 6 custom text lines that cycle seamlessly.
-- **Typing & Transition Controls**: Choose between fluid smooth reveals or granular letter-by-letter typewriter strokes, complete with toggleable flashing cursors, custom delay weights, and hold durations.
-- **Granular Text Motion**: Layer unique micro-animations on top of your transitions — including Float, Bob, Sway, Pulse, Wobble, and Orbit.
-- **Pro-Tier Paint Systems**: Build deep solid or linear multi-stop gradient styles. Features real-time color reordering, opacity shifting, variable brightness control, and automated rotating or moving gradient animations.
-- **GitHub Proxy Compatibility via Self-Contained Embedding**: External web fonts usually break on GitHub READMEs because of proxy filters. SVG Crafter bypasses this by fetching Google Fonts on the fly, converting the binary text shapes into basic-latin woff2 rules, and hardcoding them directly inside the SVG `<defs>` as a Base64 URI. Your typography stays fully intact.
-- **Categorized VFX Layering Matrix**: Mix and match high-fidelity CSS and path effects categorized cleanly into families:
-  - **Ambient**: Aurora, Blurry Lights, Shimmer, Scanlines, CRT Vignette, Sparkles
-  - **Motion**: Particles, Confetti, Matrix Rain, Sound Waves, Synthwave Grid, Starfield
-  - **Accent**: Lightning Bolts, Pulse Rings, Border Comet Beams
+## Tech Stack
+- **Framework:** React 18+ (Hooks-based state).
+- **Build Tooling:** Vite.
+- **Approach:** Everything is calculated in the browser and dispatched to a programmatic SVG generator. There is no backend, no database, and nothing is stored—it's just static HTML/JS/SVG.
 
-## 🛠️ Tech Stack & Architecture
-
-- **Framework**: React 18+ (Functional Hooks, Custom Drag-and-Drop State Engine)
-- **Build Tooling**: Vite (Lightning-fast HMR)
-- **Design Pattern**: Decoupled functional pipeline. Real-time text dimensional calculations are processed via a DOM canvas layer in the viewport and immediately dispatched to a zero-dependency programmatic SVG markup generator.
-- **Environment Constraints**: 100% client-side. No backend, no accounts, no stored user data.
-
-## 💻 Local Development Setup
-
-Get the application running on your local machine in under a minute:
-
-**1. Clone the Repository**
+## Local Development
+Clone the repo and run it locally:
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/svg-crafter.git
-```
-
-**2. Install Dependencies & Launch**
-
-Because the application lives inside the `svgcrafter` subfolder, make sure to navigate into it before running the installation:
-
-```bash
+git clone [https://github.com/MohabHindawy/SVG-Crafter.git](https://github.com/MohabHindawy/SVG-Crafter.git)
 cd svgcrafter
 npm install
 npm run dev
 ```
 
-Your local build should now be running smoothly at `http://localhost:5173/`!
+## Deployment
+This is set up to deploy to GitHub Pages automatically via Actions. Pushing to `main` triggers a build (via the workflow in `.github/workflows/deploy.yml`) which runs the production build in the `svgcrafter/` folder and pushes the `dist/` output to your Pages site.
 
-## ☁️ Deployment
+## How to use it
+1. Use the [Live App](https://mohabhindawy.github.io/SVG-Crafter/) to design your banner.
+2. Click **Download .svg** (or copy the raw SVG code).
+3. Save the file in your repo (e.g., `assets/banner.svg`).
+4. Add README snippet you copied:
+   ```markdown
+   ![Banner Name](./assets/banner.svg) # example
+   ```
 
-This project is configured to deploy automatically to GitHub Pages using GitHub Actions. Whenever code is pushed to the `main` branch, the workflow located at `.github/workflows/deploy.yml` triggers automatically. It steps into the `svgcrafter` directory, installs dependencies, builds the production assets via Vite, and pushes the `/dist` output to the live GitHub Pages URL.
+## Known Limitations
+* **GitHub's Proxy (Camo):** Some animations don't play nice with GitHub's image proxy. `animateTransform`, `stroke-dashoffset`, and some CSS transforms are hit-or-miss. Simple rotate/opacity effects are generally safe. Always push to your profile and check if it animates before relying on it.
+* **Fonts:** It only fetches the Latin subset of Google Fonts. The font weight slider is largely for system fonts; custom fonts are currently locked to their standard weight.
+* **State:** Everything is local to your browser session. If you refresh, your configuration resets.
+* **Layout:** Effects render behind the text layer. There's no Z-index control yet.
+* **Mobile:** Drag-and-drop reordering for sentence rows and gradient stops isn't fully touch-optimized; use the arrow buttons as a fallback.
 
-## 📋 How to Deploy to Your GitHub Profile
+## Contributing
+Issues and PRs are welcome. If you want to add a new effect, try to keep it CSS or SMIL-only (no `<script>` tags) so it stands a chance of passing the GitHub proxy.
 
-1. **Design**: Load up your local environment or the live URL and fine-tune your settings via the control dashboard.
-2. **Export**: Type your preferred output filename and click **Download .svg** (or click **Copy SVG** to grab the raw markup).
-3. **Commit**: Place the output file into a folder inside your profile repository (e.g., `assets/banner.svg`).
-4. **Markdown Snippet**: Copy the automatically generated snippet directly out of the Export UI block and drop it right at the top of your profile README:
-
-```markdown
-[![Welcome Banner](./assets/banner.svg)](https://github.com/YOUR_USERNAME)
-```
-
-## ⚠️ Known Limitations
-
-- **GitHub camo proxy support is unverified** for several animation techniques: `animateTransform` translate (used by Scanlines, Shimmer, Particles, Matrix Rain, Confetti), `stroke-dashoffset` animation (Border Comet Beams), gradient `gradientTransform` translate, and CSS `transform` with `transform-box: fill-box` (all text motion presets, plus Slide/Zoom/Blur transitions). Rotate-only gradients and opacity-based effects are confirmed safe. Test a real commit to your profile README before relying on the rest.
-- **Google Fonts** only fetch a single weight — the weight slider mainly affects system fonts.
-- **Font suggestions** are pulled from a bundled font list, not the live Google Fonts catalogue.
-- **Nothing persists across reloads** — panel state, font choice, and your full config reset on refresh.
-- **Effects always render below the text layer** — there's no layer-ordering control yet.
-- **Touch drag reorder** isn't supported for gradient stops or sentence rows; use the arrow buttons as a fallback on mobile.
-
-## 🤝 Contributing
-
-Issues and PRs are welcome. If you're adding a new VFX effect, keep it CSS/SMIL-only (no `<script>`) so it survives GitHub's camo proxy.
-
-## 📄 License
-
-Distributed under the MIT License. Check out the `LICENSE` file included in the root folder of this project for full details regarding open permissions.
+## License
+Distributed under the MIT License. See `LICENSE` for details.
