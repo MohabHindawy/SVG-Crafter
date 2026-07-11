@@ -454,12 +454,16 @@ const EFFECT_DEFAULTS = [
   { id: "sparkles",   enabled: false, color: "#fde047", opacity: 85, speed: 4,  count: 10,  size: 5 },
   { id: "confetti",   enabled: false, color: "#f472b6", opacity: 90, speed: 4,  count: 18,  size: 5 },
   { id: "aurora",     enabled: false, color: "#22d3ee", opacity: 45, speed: 2,  blobs: 3,   size: 60 },
+  { id: "blurlight",      enabled: false, color: "#fbbf24", opacity: 45, speed: 2,  count: 10,  size: 10 },
+  { id: "synthgrid",  enabled: false, color: "#ff2d95", opacity: 55, speed: 4,  columns: 7, rows: 5 },
+  { id: "starfield",  enabled: false, color: "#dbeafe", opacity: 70, speed: 5,  count: 18,  streak: 14 },
+  { id: "vignette",   enabled: false, color: "#000000", opacity: 60, speed: 5,  flicker: 25 },
 ];
 
 const EFFECT_META = [
   {
     id: "lightning",
-    label: "⚡ Lightning",
+    label: "Lightning",
     desc: "Zigzag bolts flicker along the banner edges",
     controls: [
       { key: "bolts",  label: "Bolts",  type: "int",   min: 1, max: 6,  step: 1 },
@@ -468,7 +472,7 @@ const EFFECT_META = [
   },
   {
     id: "soundwaves",
-    label: "〜 Sound Waves",
+    label: "Sound Waves",
     desc: "Sine waves ripple horizontally across the banner",
     controls: [
       { key: "count",       label: "Waves",     type: "int",   min: 1, max: 8,  step: 1 },
@@ -477,7 +481,7 @@ const EFFECT_META = [
   },
   {
     id: "particles",
-    label: "✦ Particles",
+    label: "Particles",
     desc: "Glowing sparks drift upward and fade out",
     controls: [
       { key: "count", label: "Count", type: "int",   min: 3, max: 40, step: 1 },
@@ -486,7 +490,7 @@ const EFFECT_META = [
   },
   {
     id: "scanlines",
-    label: "📺 Scanlines",
+    label: "Scanlines",
     desc: "CRT grid with a glowing beam sweeping top to bottom",
     controls: [
       { key: "lineGap",    label: "Line gap",    type: "int", min: 2, max: 20, step: 1, fmt: v => `${v}px` },
@@ -495,7 +499,7 @@ const EFFECT_META = [
   },
   {
     id: "shimmer",
-    label: "✨ Shimmer",
+    label: "Shimmer",
     desc: "Diagonal gloss highlight sweeps across the banner",
     controls: [
       { key: "beamWidth", label: "Beam width", type: "int", min: 20, max: 300, step: 10, fmt: v => `${v}px` },
@@ -503,7 +507,7 @@ const EFFECT_META = [
   },
   {
     id: "pulserings",
-    label: "◎ Pulse Rings",
+    label: "Pulse Rings",
     desc: "Rings expand outward from the center and fade",
     controls: [
       { key: "count",       label: "Rings",     type: "int",   min: 1, max: 8,  step: 1 },
@@ -512,7 +516,7 @@ const EFFECT_META = [
   },
   {
     id: "matrixrain",
-    label: "⬇ Matrix Rain",
+    label: "Matrix Rain",
     desc: "Columns of glowing dots rain downward",
     controls: [
       { key: "columns", label: "Columns",  type: "int",   min: 3, max: 30, step: 1 },
@@ -521,7 +525,7 @@ const EFFECT_META = [
   },
   {
     id: "borderbeam",
-    label: "◉ Border Beam",
+    label: "Border Beam",
     desc: "Glowing comets orbit around the banner's border",
     controls: [
       { key: "count",      label: "Comets",    type: "int",   min: 1, max: 4,  step: 1 },
@@ -531,7 +535,7 @@ const EFFECT_META = [
   },
   {
     id: "sparkles",
-    label: "✧ Sparkles",
+    label: "Sparkles",
     desc: "Four-point stars twinkle in and out across the banner",
     controls: [
       { key: "count", label: "Count", type: "int",   min: 3, max: 30, step: 1 },
@@ -540,7 +544,7 @@ const EFFECT_META = [
   },
   {
     id: "confetti",
-    label: "🎊 Confetti",
+    label: "Confetti",
     desc: "Colourful pieces tumble down, hues derived from your colour",
     controls: [
       { key: "count", label: "Count", type: "int",   min: 5, max: 40, step: 1 },
@@ -549,11 +553,46 @@ const EFFECT_META = [
   },
   {
     id: "aurora",
-    label: "≋ Aurora",
+    label: "Aurora",
     desc: "Soft blurred colour blobs drift slowly behind the text",
     controls: [
       { key: "blobs", label: "Blobs", type: "int", min: 1, max: 4,   step: 1 },
       { key: "size",  label: "Size",  type: "int", min: 30, max: 120, step: 5, fmt: v => `${v}%` },
+    ],
+  },
+  {
+    id: "blurlight",
+    label: "Blurry Lights",
+    desc: "Soft out-of-focus orbs drift slowly upward",
+    controls: [
+      { key: "count", label: "Orbs", type: "int", min: 3, max: 25, step: 1 },
+      { key: "size",  label: "Size", type: "int", min: 4, max: 24, step: 1, fmt: v => `${v}px` },
+    ],
+  },
+  {
+    id: "synthgrid",
+    label: "Synthwave Grid",
+    desc: "Retro 3D wireframe floor scrolls toward the viewer",
+    controls: [
+      { key: "columns", label: "Columns", type: "int", min: 3, max: 12, step: 1 },
+      { key: "rows",    label: "Rows",    type: "int", min: 2, max: 8,  step: 1 },
+    ],
+  },
+  {
+    id: "starfield",
+    label: "Starfield",
+    desc: "Hyperspace streaks shoot from the centre outward",
+    controls: [
+      { key: "count",  label: "Streaks", type: "int", min: 6, max: 40, step: 1 },
+      { key: "streak", label: "Length",  type: "int", min: 5, max: 30, step: 1, fmt: v => `${v}%` },
+    ],
+  },
+  {
+    id: "vignette",
+    label: "CRT Vignette",
+    desc: "Edges darken with a subtle CRT flicker — pairs with scanlines",
+    controls: [
+      { key: "flicker", label: "Flicker", type: "int", min: 0, max: 100, step: 5, fmt: v => `${v}%` },
     ],
   },
 ];
@@ -635,8 +674,8 @@ function EffectCard({ meta, eff, onChange }) {
 
 // Effects grouped by visual family so the 11 cards aren't one long scroll.
 const EFFECT_GROUPS = [
-  { title: "Ambient",  ids: ["aurora", "shimmer", "scanlines", "sparkles"] },
-  { title: "Motion",   ids: ["particles", "confetti", "matrixrain", "soundwaves"] },
+  { title: "Ambient",  ids: ["aurora", "blurlight", "shimmer", "scanlines", "vignette", "sparkles"] },
+  { title: "Motion",   ids: ["particles", "confetti", "matrixrain", "soundwaves", "synthgrid", "starfield"] },
   { title: "Accent",   ids: ["lightning", "pulserings", "borderbeam"] },
 ];
 
@@ -646,16 +685,10 @@ function EffectsTab({ effects, onChange }) {
       ? effects.map(e => e.id === id ? updated : e)
       : [...effects, updated]
   );
-  const activeCount = effects.filter(e => e.enabled).length;
   const activeIn = (ids) => ids.filter(id => effects.find(e => e.id === id)?.enabled).length;
 
   return (
     <div>
-      <p className="eff-hint">
-        {activeCount === 0
-          ? "Enable effects to layer atmosphere onto your banner. They stack freely."
-          : `${activeCount} effect${activeCount > 1 ? "s" : ""} active — expand any card to tune it.`}
-      </p>
       {EFFECT_GROUPS.map((group, gi) => (
         <Section
           key={group.title}
@@ -686,6 +719,7 @@ function EffectsTab({ effects, onChange }) {
 export default function App() {
   const [tab, setTab] = useState("text");
   const [copied, setCopied] = useState("");
+  const [fileName, setFileName] = useState("banner");
   const [dragSentence, setDragSentence] = useState(null);
   const [config, setConfig] = useState({
     sentences: ["Welcome 👋", "SVG Crafter"],
@@ -870,7 +904,8 @@ export default function App() {
   const dataUri = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   const link = normalizeUrl(config.linkUrl);
   const alt = config.sentences[0] || "banner";
-  const imageMd = `![${alt}](./assets/banner.svg)`;
+  const safeName = fileName.trim().replace(/\.svg$/i, "").replace(/[\\/:*?"<>|]/g, "").trim() || "banner";
+  const imageMd = `![${alt}](./assets/${safeName}.svg)`;
   const markdown = link ? `[${imageMd}](${link})` : imageMd;
 
   async function copy(value, which) {
@@ -884,7 +919,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "banner.svg";
+    a.download = `${safeName}.svg`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -1262,6 +1297,16 @@ export default function App() {
 
         <section className="export">
           <h2>Export</h2>
+          <label className="field">
+            <span>File name</span>
+            <input
+              type="text"
+              value={fileName}
+              onChange={(e) => setFileName(e.target.value)}
+              placeholder="banner"
+            />
+          </label>
+
           <div className="actions">
             <button onClick={() => copy(svg, "svg")}>{copied === "svg" ? "Copied" : "Copy SVG"}</button>
             <button onClick={download}>Download .svg</button>

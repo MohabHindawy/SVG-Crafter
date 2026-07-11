@@ -620,37 +620,47 @@ function buildBorderBeam(cfg, W, H, br) {
   const o     = op(cfg.opacity ?? 90);
   const speed = clamp(Number(cfg.speed) || 4, 1, 10);
   const count = clamp(Math.round(cfg.count ?? 1), 1, 4);
-  const tail  = clamp(Number(cfg.tailLength) || 18, 5, 40);   // % of perimeter
   const thick = clamp(Number(cfg.thickness) || 3, 1, 8);
 
-  const dur    = round(24 / speed, 2);
-  const head   = adjustBrightness(color, 165);
-  const inset  = thick / 2 + 0.5;
-  const rx     = Math.max(0, br - inset);
+  const seg   = 100 / count;
+  // Clamp tail so adjacent comets never run into each other.
+  const tail  = Math.min(clamp(Number(cfg.tailLength) || 18, 5, 40), round(seg * 0.8, 2));
+
+  const dur   = round(24 / speed, 2);
+  const head  = adjustBrightness(color, 165);
+  const inset = thick / 2 + 0.5;
+  const rx    = Math.max(0, br - inset);
   const rectAttrs = `x="${round(inset, 1)}" y="${round(inset, 1)}" width="${round(W - inset * 2, 1)}" height="${round(H - inset * 2, 1)}" rx="${round(rx, 1)}" fill="none" pathLength="100" stroke-linecap="round"`;
 
-  // count comets evenly spaced → dash pattern repeats every 100/count units
-  const seg = 100 / count;
-  const layer = (len, w, col, alpha, shift) => {
-    const on  = round(Math.min(len, seg * 0.9), 2);
-    const offv = round(seg - on, 2);
+  // A dash of length `len` occupies path positions [-offset, -offset + len];
+  // animating the offset downward moves it FORWARD along the path. Every layer
+  // sets offset = len - tail so all leading edges align at position `tail` —
+  // the bright head sits at the FRONT and longer, fainter layers trail behind.
+  const layer = (len, w, col, alpha) => {
+    const on    = round(Math.min(len, seg * 0.9), 2);
+    const shift = round(on - tail, 2);
     return (
       `<rect ${rectAttrs} stroke="${col}" stroke-width="${round(w, 2)}" stroke-opacity="${round(alpha, 3)}" ` +
-      `stroke-dasharray="${on} ${offv}">` +
-      `<animate attributeName="stroke-dashoffset" from="${round(shift, 2)}" to="${round(shift - 100, 2)}" dur="${dur}s" repeatCount="indefinite"/>` +
+      `stroke-dasharray="${on} ${round(seg - on, 2)}">` +
+      `<animate attributeName="stroke-dashoffset" from="${shift}" to="${round(shift - 100, 2)}" dur="${dur}s" repeatCount="indefinite"/>` +
       `</rect>`
     );
   };
 
-  // Dashes lead with their END edge as offset decreases, so shorter layers are
-  // shifted to align at the head (leading edge) of the longest dash.
+  // Clip to the banner's rounded rect so the wide glow stroke can't spill
+  // outside the shape (the "transparent border" halo at high thickness).
+  const defs = [`<clipPath id="bbClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`];
   const els = [
-    layer(tail,        thick * 2.6, color, o * 0.22, 0),               // soft glow
-    layer(tail,        thick,       color, o * 0.75, 0),               // main tail
-    layer(tail * 0.28, thick,       head,  o,        tail * 0.72),     // bright head
+    `<g clip-path="url(#bbClip)">`,
+    layer(tail,        thick * 2.4, color, o * 0.16),   // soft glow underlay
+    layer(tail,        thick,       color, o * 0.22),   // faint far tail
+    layer(tail * 0.62, thick,       color, o * 0.4),    // mid tail
+    layer(tail * 0.34, thick,       color, o * 0.65),   // near tail
+    layer(tail * 0.14, thick,       head,  o),          // bright head (front)
+    `</g>`,
   ];
 
-  return { defs: [], els, css: "" };
+  return { defs, els, css: "" };
 }
 
 // ── 9. SPARKLES ──────────────────────────────────────────────────────────────
@@ -788,6 +798,188 @@ function buildAurora(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
+// ── 12. Blur light ────────────────────────────────────────────────────────────────
+// Soft out-of-focus orbs drifting slowly upward. Three shared Gaussian blur
+// levels fake depth of field; opacity breathing + negative begins, no flash.
+function buildBlurlight(cfg, W, H, br) {
+  const color = cfg.color || "#fbbf24";
+  const o     = op(cfg.opacity ?? 45);
+  const speed = clamp(Number(cfg.speed) || 2, 1, 10);
+  const count = clamp(Math.round(cfg.count ?? 10), 3, 25);
+  const size  = clamp(Number(cfg.size) || 10, 4, 24);
+
+  const rand    = seededRand(929);
+  const baseDur = round(30 / speed, 2);
+  const blurs   = [round(H * 0.015, 1), round(H * 0.04, 1), round(H * 0.08, 1)];
+  const defs = [
+    `<clipPath id="bkClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`,
+    ...blurs.map((b, i) =>
+      `<filter id="bkBlur${i}" x="-120%" y="-120%" width="340%" height="340%"><feGaussianBlur stdDeviation="${b}"/></filter>`),
+  ];
+  const els = [`<g clip-path="url(#bkClip)">`];
+
+  for (let i = 0; i < count; i++) {
+    const depth = i % 3;                                   // 0 sharp … 2 blurry
+    const x     = round(W * (0.04 + rand() * 0.92), 1);
+    const y     = round(H * (0.35 + rand() * 0.6), 1);
+    const r     = round(size * (0.5 + rand() * 1.1) * (1 + depth * 0.45), 1);
+    const dy    = round(-H * (0.25 + rand() * 0.3), 1);
+    const dx    = round(W * (rand() - 0.5) * 0.06, 1);
+    const dur   = round(baseDur * (0.7 + rand() * 0.7), 2);
+    const begin = round(-(rand() * dur), 2);
+    const pO    = round(o * (0.45 + rand() * 0.55) * (1 - depth * 0.18), 3);
+
+    els.push(
+      `<circle cx="${x}" cy="${y}" r="${r}" fill="${color}" opacity="0" filter="url(#bkBlur${depth})">` +
+      `<animateTransform attributeName="transform" type="translate" values="0 0;${dx} ${dy}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
+      `<animate attributeName="opacity" values="0;${pO};${pO};0" keyTimes="0;0.2;0.75;1" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
+      `</circle>`
+    );
+  }
+  els.push(`</g>`);
+
+  return { defs, els, css: "" };
+}
+
+// ── 13. SYNTHWAVE GRID ───────────────────────────────────────────────────────
+// Retro 3D wireframe floor: static verticals fan out from a vanishing point,
+// horizontal lines scroll toward the viewer along a quadratic (perspective)
+// easing sampled into SMIL `values`. A vertical fade gradient on the strokes
+// dissolves everything into the horizon. Negative begins pre-bake positions.
+function buildSynthGrid(cfg, W, H, br) {
+  const color = cfg.color || "#ff2d95";
+  const o     = op(cfg.opacity ?? 55);
+  const speed = clamp(Number(cfg.speed) || 4, 1, 10);
+  const cols  = clamp(Math.round(cfg.columns ?? 7), 3, 12);   // per side
+  const rows  = clamp(Math.round(cfg.rows ?? 5), 2, 8);
+
+  const yH   = round(H * 0.52, 1);        // horizon
+  const cx   = round(W / 2, 1);
+  const dur  = round(10 / speed, 2);
+  const defs = [
+    `<clipPath id="sgClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`,
+    `<linearGradient id="sgFade" gradientUnits="userSpaceOnUse" x1="0" y1="${yH}" x2="0" y2="${H}">` +
+    `<stop offset="0" stop-color="${color}" stop-opacity="0"/>` +
+    `<stop offset="0.25" stop-color="${color}" stop-opacity="${round(o * 0.55, 3)}"/>` +
+    `<stop offset="1" stop-color="${color}" stop-opacity="${round(o, 3)}"/>` +
+    `</linearGradient>`,
+  ];
+  const els = [`<g clip-path="url(#sgClip)">`];
+
+  // Static converging verticals (mirrored around the centre).
+  const spread = W / (cols * 0.9);
+  for (let i = -cols; i <= cols; i++) {
+    if (i === 0) continue;
+    const bx = round(cx + i * spread, 1);
+    els.push(`<line x1="${cx}" y1="${yH}" x2="${bx}" y2="${H}" stroke="url(#sgFade)" stroke-width="1"/>`);
+  }
+  // Horizon glow line.
+  els.push(`<line x1="0" y1="${yH}" x2="${W}" y2="${yH}" stroke="${color}" stroke-opacity="${round(o * 0.5, 3)}" stroke-width="1.5"/>`);
+
+  // Scrolling horizontals: y(t) = yH + (H − yH)·t², sampled for SMIL.
+  const samples = 13;
+  const ys = [];
+  for (let k = 0; k < samples; k++) {
+    const t = k / (samples - 1);
+    ys.push(round(yH + (H - yH) * t * t, 1));
+  }
+  const vals = ys.join(";");
+  for (let rI = 0; rI < rows; rI++) {
+    const begin = round(-(rI / rows) * dur, 2);
+    els.push(
+      `<line x1="0" y1="${yH}" x2="${W}" y2="${yH}" stroke="url(#sgFade)" stroke-width="1.4">` +
+      `<animate attributeName="y1" values="${vals}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="linear"/>` +
+      `<animate attributeName="y2" values="${vals}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="linear"/>` +
+      `</line>`
+    );
+  }
+  els.push(`</g>`);
+
+  return { defs, els, css: "" };
+}
+
+// ── 14. STARFIELD (WARP) ─────────────────────────────────────────────────────
+// Streaks shooting from the centre to the edges — hyperspace jump. Each ray is
+// a line with pathLength="100"; a short dash travels start→end via animated
+// stroke-dashoffset with an ease-in spline (accelerating outward). Dash starts
+// fully off-path (offset = streak length) → invisible baseline, no flash.
+function buildStarfield(cfg, W, H, br) {
+  const color  = cfg.color || "#dbeafe";
+  const o      = op(cfg.opacity ?? 70);
+  const speed  = clamp(Number(cfg.speed) || 5, 1, 10);
+  const count  = clamp(Math.round(cfg.count ?? 18), 6, 40);
+  const streak = clamp(Number(cfg.streak) || 14, 5, 30);   // % of ray length
+
+  const rand    = seededRand(1201);
+  const baseDur = round(7 / speed, 2);
+  const cx = round(W / 2, 1), cy = round(H / 2, 1);
+  const R  = Math.hypot(W / 2, H / 2) * 1.02;
+  const defs = [`<clipPath id="stClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`];
+  const els  = [`<g clip-path="url(#stClip)">`];
+
+  for (let i = 0; i < count; i++) {
+    const ang = (i / count) * Math.PI * 2 + rand() * 0.5;
+    const r0  = R * (0.04 + rand() * 0.06);
+    const x1  = round(cx + Math.cos(ang) * r0, 1);
+    const y1  = round(cy + Math.sin(ang) * r0, 1);
+    const x2  = round(cx + Math.cos(ang) * R, 1);
+    const y2  = round(cy + Math.sin(ang) * R, 1);
+    const on  = round(streak * (0.7 + rand() * 0.6), 2);
+    const dur = round(baseDur * (0.6 + rand() * 0.9), 2);
+    const begin = round(-(rand() * dur), 2);
+    const sw  = round(0.8 + rand() * 1.4, 2);
+    const pO  = round(o * (0.5 + rand() * 0.5), 3);
+
+    els.push(
+      `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" pathLength="100" fill="none" ` +
+      `stroke="${color}" stroke-width="${sw}" stroke-opacity="${pO}" stroke-linecap="round" ` +
+      `stroke-dasharray="${on} ${round(100 - on, 2)}" stroke-dashoffset="${on}">` +
+      `<animate attributeName="stroke-dashoffset" values="${on};-100" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="spline" keySplines="0.55 0 0.9 0.6"/>` +
+      `</line>`
+    );
+  }
+  els.push(`</g>`);
+
+  return { defs, els, css: "" };
+}
+
+// ── 15. CRT VIGNETTE ─────────────────────────────────────────────────────────
+// Radial darkening toward the edges + a subtle discrete opacity flicker, like
+// a failing CRT. Renders last in the effect stack so it sits over the other
+// effects. Pairs with scanlines.
+function buildVignette(cfg, W, H, br) {
+  const color   = cfg.color || "#000000";
+  const o       = op(cfg.opacity ?? 60);
+  const speed   = clamp(Number(cfg.speed) || 5, 1, 10);
+  const flicker = clamp(Number(cfg.flicker ?? 25), 0, 100) / 100;
+
+  const defs = [
+    `<radialGradient id="vgGrad" cx="50%" cy="50%" r="72%">` +
+    `<stop offset="0" stop-color="${color}" stop-opacity="0"/>` +
+    `<stop offset="0.55" stop-color="${color}" stop-opacity="0"/>` +
+    `<stop offset="1" stop-color="${color}" stop-opacity="${round(o, 3)}"/>` +
+    `</radialGradient>`,
+  ];
+
+  let anim = "";
+  if (flicker > 0) {
+    const rand = seededRand(547);
+    const dur  = round(9 / speed, 2);
+    const n    = 18;
+    const vals = [], times = [];
+    for (let k = 0; k < n; k++) {
+      vals.push(round(1 - rand() * flicker * 0.5, 3));
+      times.push(round(k / n, 3));
+    }
+    vals.push(vals[0]); times.push(1);
+    anim = `<animate attributeName="opacity" values="${vals.join(";")}" keyTimes="${times.join(";")}" dur="${dur}s" repeatCount="indefinite" calcMode="discrete"/>`;
+  }
+
+  const els = [`<rect width="${W}" height="${H}" rx="${br}" fill="url(#vgGrad)">${anim}</rect>`];
+
+  return { defs, els, css: "" };
+}
+
 // ── Text motion (per-sentence) ───────────────────────────────────────────────
 // A subtle looping transform applied to a <g> WRAPPING each text element, so it
 // composes cleanly with the text's own transition (clip-path for typing, CSS
@@ -856,6 +1048,10 @@ function buildEffects(effects, W, H, br) {
     if (eff.id === "sparkles")   r = buildSparkles(eff,   W, H, br);
     if (eff.id === "confetti")   r = buildConfetti(eff,   W, H, br);
     if (eff.id === "aurora")     r = buildAurora(eff,     W, H, br);
+    if (eff.id === "blurlight")  r = buildBlurlight(eff,  W, H, br);
+    if (eff.id === "synthgrid")  r = buildSynthGrid(eff,  W, H, br);
+    if (eff.id === "starfield")  r = buildStarfield(eff,  W, H, br);
+    if (eff.id === "vignette")   r = buildVignette(eff,   W, H, br);
     if (!r) continue;
     allDefs.push(...r.defs);
     allEls.push(...r.els);
