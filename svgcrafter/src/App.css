@@ -327,6 +327,19 @@ input:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 .actions button:hover { filter: brightness(1.08); }
 .actions button:active { transform: scale(0.98); }
+.import-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 10px; font-family: var(--font-body); font-weight: 700; font-size: 14px;
+  padding: 13px; cursor: pointer; transition: transform 0.1s, filter 0.15s;
+}
+.import-btn:hover { filter: brightness(1.15); }
+.import-btn:active { transform: scale(0.98); }
+
+.import-note { margin: -12px 0 18px; font-size: 12px; font-weight: 600; }
+.import-note.ok { color: var(--accent); }
+.import-note.warn { color: #fbbf24; }
+.import-note.error { color: #ff6b7d; }
 
 .snippet {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
