@@ -849,6 +849,10 @@ function parseLegacySvg(root, cssText) {
 
   const cfg = defaultConfig();
   const notes = [];
+  // Each stage runs isolated: an unexpected structure (e.g. a file from an
+  // older generator version) degrades that one field to defaults instead of
+  // aborting the whole legacy parse and losing everything.
+  const stage = (name, fn) => { try { fn(); } catch { notes.push(name); } };
 
   // ---- dimensions -----------------------------------------------------------
   const W = Number(root.getAttribute("width"));
@@ -896,9 +900,13 @@ function parseLegacySvg(root, cssText) {
   };
 
   // ---- background / border (the main rect) ----------------------------------
-  const mainRect = [...root.children].find((el) =>
-    el.tagName === "rect" && !el.hasAttribute("pathLength") && el.getAttribute("fill") !== "none");
-  if (mainRect) {
+  stage("background", () => {
+    const mainRect =
+      [...root.children].find((el) =>
+        el.tagName === "rect" && !el.hasAttribute("pathLength") &&
+        el.getAttribute("fill") && el.getAttribute("fill") !== "none") ||
+      root.querySelector('rect[fill="url(#bgPaint)"]');
+    if (!mainRect) return;
     cfg.bgPaint = parsePaint(mainRect.getAttribute("fill"), mainRect.getAttribute("fill-opacity")) || cfg.bgPaint;
     cfg.borderRadius = Math.round(Number(mainRect.getAttribute("rx")) || 0);
     const stroke = mainRect.getAttribute("stroke");
@@ -907,31 +915,34 @@ function parseLegacySvg(root, cssText) {
       cfg.borderWidth = Number(mainRect.getAttribute("stroke-width")) || 2;
       cfg.borderPaint = parsePaint(stroke, mainRect.getAttribute("stroke-opacity")) || cfg.borderPaint;
     }
-  }
+  });
 
   // ---- text: sentences, font, paint, glow ------------------------------------
   cfg.sentences = texts.map((t) => t.textContent).slice(0, 6);
   const t0 = texts[0];
-  cfg.fontSize = Number(t0.getAttribute("font-size")) || cfg.fontSize;
-  cfg.fontWeight = Number(t0.getAttribute("font-weight")) || cfg.fontWeight;
-  cfg.glow = (t0.getAttribute("filter") || "").includes("glow");
-  cfg.textPaint = parsePaint(t0.getAttribute("fill"), t0.getAttribute("fill-opacity")) || cfg.textPaint;
+  let familyStr = FONTS[0].stack;
+  stage("text style", () => {
+    cfg.fontSize = Number(t0.getAttribute("font-size")) || cfg.fontSize;
+    cfg.fontWeight = Number(t0.getAttribute("font-weight")) || cfg.fontWeight;
+    cfg.glow = (t0.getAttribute("filter") || "").includes("glow");
+    cfg.textPaint = parsePaint(t0.getAttribute("fill"), t0.getAttribute("fill-opacity")) || cfg.textPaint;
 
-  const famAttr = t0.getAttribute("font-family") || "";
-  const sysMatch = FONTS.find((f) => f.stack === famAttr);
-  if (sysMatch) {
-    cfg.fontId = sysMatch.id;
-  } else {
-    const fam = famAttr.match(/^'([^']+)'/);
-    if (fam && !FONTS.some((f) => f.stack.includes(fam[1]))) {
-      cfg.googleFont = fam[1];   // triggers the existing auto-refetch effect
-      cfg.fontId = "custom";
-      notes.push("font will re-download");
+    const famAttr = t0.getAttribute("font-family") || "";
+    const sysMatch = FONTS.find((f) => f.stack === famAttr);
+    if (sysMatch) {
+      cfg.fontId = sysMatch.id;
+      familyStr = sysMatch.stack;
+    } else {
+      const fam = famAttr.match(/^'([^']+)'/);
+      if (fam && !FONTS.some((f) => f.stack.includes(fam[1]))) {
+        cfg.googleFont = fam[1];   // triggers the existing auto-refetch effect
+        cfg.fontId = "custom";
+      }
     }
-  }
-  const familyStr = sysMatch ? sysMatch.stack : FONTS[0].stack;
+  });
 
   // ---- transition ------------------------------------------------------------
+  stage("transition", () => {
   const typingClip = root.querySelector('clipPath[id^="clip"] rect > animate[attributeName="width"]');
   if (typingClip) {
     cfg.transition = "typing";
@@ -960,8 +971,10 @@ function parseLegacySvg(root, cssText) {
       cfg.transition = "none";
     }
   }
+  });
 
   // ---- per-sentence motion + alignment ---------------------------------------
+  stage("text motion", () => {
   cfg.sentenceMotions = texts.map((t) => {
     const wrap = t.closest("g[class^=mv]");
     if (!wrap) return "none";
@@ -974,8 +987,10 @@ function parseLegacySvg(root, cssText) {
     if (body.includes("translate(")) return body.startsWith("0%{transform:translate(0,0)") ? "float" : "orbit";
     return "none";
   });
+  });
 
   const PAD = 28;
+  stage("alignment", () => {
   cfg.sentenceAligns = texts.map((t, i) => {
     if (t.hasAttribute("textLength")) return "justify";
     const x = Number(t.getAttribute("x")) || PAD;
@@ -983,24 +998,88 @@ function parseLegacySvg(root, cssText) {
     const candidates = { left: PAD, center: (W - w) / 2, right: W - PAD - w };
     return Object.entries(candidates).sort((a, b) => Math.abs(a[1] - x) - Math.abs(b[1] - x))[0][0];
   });
+  });
   cfg.sentenceIds = cfg.sentences.map(() => uid());
 
-  // ---- effects: detect by marker id, recover colour ---------------------------
+  // ---- effects: detect by marker id, recover colour + parameters --------------
   cfg.effects = EFFECT_DEFAULTS.map((d) => {
     const marker = Object.keys(LEGACY_EFFECT_MARKERS).find((k) => LEGACY_EFFECT_MARKERS[k] === d.id);
-    const node = marker && root.querySelector(`[id="${marker}"]`);
+    let node = marker && root.querySelector(`[id="${marker}"]`);
+    // Pre-session exports had no bbClip — detect old borderbeam structurally.
+    if (!node && d.id === "borderbeam") node = root.querySelector("rect[pathLength]");
     if (!node) return d;
-    let color = d.color;
-    if (d.id === "vignette") {
-      const stop = node.querySelectorAll("stop")[2];
-      if (stop) color = stop.getAttribute("stop-color") || color;
-    } else {
+    const eff = { ...d, enabled: true };
+    try {
       const grp = root.querySelector(`g[clip-path="url(#${marker})"]`);
+      if (d.id === "vignette") {
+        const stop = node.querySelectorAll("stop")[2];
+        if (stop) eff.color = stop.getAttribute("stop-color") || eff.color;
+        eff.flicker = root.querySelector('rect[fill="url(#vgGrad)"] > animate') ? eff.flicker : 0;
+        return eff;
+      }
+      if (!grp && d.id !== "borderbeam") return eff;
       const el = grp && grp.querySelector("[fill]:not([fill='none']), [stroke]");
-      if (el) color = el.getAttribute("fill") && el.getAttribute("fill") !== "none"
-        ? el.getAttribute("fill") : (el.getAttribute("stroke") || color);
-    }
-    return { ...d, enabled: true, color };
+      if (el) eff.color = el.getAttribute("fill") && el.getAttribute("fill") !== "none"
+        ? el.getAttribute("fill") : (el.getAttribute("stroke") || eff.color);
+
+      const num = (v) => Number(v) || 0;
+      switch (d.id) {
+        case "borderbeam": {
+          // Layers are rects with pathLength — works for both the old 3-layer
+          // and new 5-layer formats. Comet count from the dash period, tail
+          // from the longest dash, thickness from the narrowest stroke (the
+          // glow underlay is thick × 2.4–2.6), colour from a non-brightened
+          // layer, speed from the shared duration (dur = 24 / speed).
+          const layers = [...(grp || root).querySelectorAll("rect[pathLength]")]
+            .map((r) => {
+              const [on, gap] = (r.getAttribute("stroke-dasharray") || "0 0").split(/\s+/).map(Number);
+              return { on, gap, w: num(r.getAttribute("stroke-width")),
+                stroke: r.getAttribute("stroke"),
+                dur: parseFloat(r.querySelector("animate")?.getAttribute("dur")) || 6 };
+            })
+            .filter((l) => l.on > 0);
+          if (layers.length) {
+            eff.count = Math.max(1, Math.min(4, Math.round(100 / (layers[0].on + layers[0].gap))));
+            eff.tailLength = Math.round(Math.max(...layers.map((l) => l.on)));
+            eff.thickness = Math.min(...layers.map((l) => l.w));
+            eff.color = layers[0].stroke || eff.color;   // widest/glow layer = base colour
+            eff.speed = Math.max(1, Math.min(10, Math.round(24 / layers[0].dur)));
+          }
+          break;
+        }
+        case "soundwaves": {
+          const paths = grp.querySelectorAll("path");
+          eff.count = paths.length || eff.count;
+          eff.strokeWidth = num(paths[0]?.getAttribute("stroke-width")) || eff.strokeWidth;
+          break;
+        }
+        case "pulserings": {
+          const rings = grp.querySelectorAll("ellipse, circle");
+          eff.count = rings.length || eff.count;
+          eff.strokeWidth = num(rings[0]?.getAttribute("stroke-width")) || eff.strokeWidth;
+          break;
+        }
+        case "particles": case "bokeh":
+          eff.count = grp.querySelectorAll("circle").length || eff.count; break;
+        case "sparkles":
+          eff.count = grp.querySelectorAll("path").length || eff.count; break;
+        case "confetti":
+          eff.count = grp.querySelectorAll("rect").length || eff.count; break;
+        case "starfield":
+          eff.count = grp.querySelectorAll("line").length || eff.count; break;
+        case "aurora":
+          eff.blobs = grp.querySelectorAll("ellipse").length || eff.blobs; break;
+        case "synthgrid": {
+          const lines = [...grp.querySelectorAll("line")];
+          const scrolling = lines.filter((l) => l.querySelector("animate")).length;
+          if (scrolling) eff.rows = scrolling;
+          const statics = lines.length - scrolling - 1;   // minus horizon line
+          if (statics > 0) eff.columns = Math.round(statics / 2);
+          break;
+        }
+      }
+    } catch { notes.push(d.id); }
+    return eff;
   });
 
   return cfg;
