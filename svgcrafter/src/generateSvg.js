@@ -1,9 +1,10 @@
-// generateSvg.js  —  SVG Crafter
-// ---------------------------------------------------------------------------
-// Pure function: config in -> self-contained SVG string out.
-//   1. NO DOM access (text widths are measured by the caller) -> unit-testable.
-//   2. CSS + SMIL only, never <script> -> survives GitHub's image proxy.
-// ---------------------------------------------------------------------------
+// This is the core engine. It takes the user's configuration and spits out a standalone SVG string.
+// We strictly use CSS and SMIL animations here (no JavaScript in the SVG) so it plays nicely with GitHub's image proxy. 
+// It's also fully decoupled from the DOM, making it very easy to test in isolation.
+
+// ============================================================================
+// 1. Constants and utility functions
+// ============================================================================
 
 const FONT_STACK = "'Segoe UI', system-ui, -apple-system, Arial, sans-serif";
 const CHAR_TYPE = 0.13;
@@ -20,26 +21,75 @@ export function autoSize(sentences = [], fontSize = 40) {
   return { width: Math.round(maxWidth + PADDING * 2), height: Math.round(fontSize * 2.2) };
 }
 
+function seededRand(seed) {
+  let s = (seed >>> 0) || 1;
+  const next = () => { s = Math.imul(s, 48271) >>> 0; return s / 4294967296; };
+  // Warm up the PRNG generator: discarding the first few outputs prevents early bias towards low numbers which can make the visual effects cluster unnaturally.
+  for (let i = 0; i < 5; i++) next();
+  return next;
+}
+
+// ============================================================================
+// 2. Colours and gradients
+// ============================================================================
+
 function hexToRgb(hex) {
   let h = String(hex).replace("#", "");
   if (h.length === 3) h = h.split("").map((c) => c + c).join("");
   const n = parseInt(h, 16) || 0;
   return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
 }
+
 function rgbToHex(r, g, b) {
   return "#" + [r, g, b].map((v) => clamp(Math.round(v), 0, 255).toString(16).padStart(2, "0")).join("");
 }
+
 export function adjustBrightness(hex, brightness = 100) {
   if (brightness === 100) return hex;
   const f = brightness / 100;
   const { r, g, b } = hexToRgb(hex);
   return rgbToHex(r * f, g * f, b * f);
 }
+
+// Utility for shifting hex colors along the hue wheel. 
+// Very handy for procedurally generating palettes for things like confetti or auroras based entirely on the user's primary selected color.
+function hueShift(hex, deg) {
+  const { r, g, b } = hexToRgb(hex);
+  const rf = r / 255, gf = g / 255, bf = b / 255;
+  const mx = Math.max(rf, gf, bf), mn = Math.min(rf, gf, bf);
+  const l = (mx + mn) / 2;
+  let h = 0, s = 0;
+  if (mx !== mn) {
+    const d = mx - mn;
+    s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+    if (mx === rf) h = ((gf - bf) / d + (gf < bf ? 6 : 0)) / 6;
+    else if (mx === gf) h = ((bf - rf) / d + 2) / 6;
+    else h = ((rf - gf) / d + 4) / 6;
+  }
+  h = (h + deg / 360 + 1) % 1;
+  const hue2 = (p, q, t) => {
+    t = (t + 1) % 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+  let r2, g2, b2;
+  if (s === 0) { r2 = g2 = b2 = l; }
+  else {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r2 = hue2(p, q, h + 1 / 3); g2 = hue2(p, q, h); b2 = hue2(p, q, h - 1 / 3);
+  }
+  return rgbToHex(r2 * 255, g2 * 255, b2 * 255);
+}
+
 function angleToCoords(angle) {
   const a = (Number(angle) * Math.PI) / 180;
   const dx = Math.cos(a), dy = Math.sin(a);
   return { x1: round(0.5 - dx / 2), y1: round(0.5 - dy / 2), x2: round(0.5 + dx / 2), y2: round(0.5 + dy / 2) };
 }
+
 function gradientAnim(paint, c) {
   const mode = paint.anim || "none";
   if (mode === "none") return { spread: "", el: "" };
@@ -54,7 +104,7 @@ function gradientAnim(paint, c) {
       el: `\n      <animateTransform attributeName="gradientTransform" type="rotate" from="${from}" to="${to}" dur="${dur}s" repeatCount="indefinite"/>`,
     };
   }
-  // reflect tiling: seamless loop, no hard stop-boundary seam
+  // To avoid an ugly seam when the gradient animates linearly, we use spreadMethod="reflect" to bounce the colors back seamlessly.
   const dur = round(36 / speed, 2);
   let dx = round(2 * (c.x2 - c.x1), 4), dy = round(2 * (c.y2 - c.y1), 4);
   if (reverse) { dx = -dx; dy = -dy; }
@@ -83,6 +133,7 @@ function resolvePaint(paint, id, defs) {
     </linearGradient>`);
   return { fill: `url(#${id})`, opacity: 1 };
 }
+
 function paintMain(paint) {
   if (!paint) return { color: "#000000", opacity: 1 };
   if (paint.type !== "gradient") return { color: adjustBrightness(paint.color, paint.brightness), opacity: op(paint.opacity) };
@@ -90,7 +141,12 @@ function paintMain(paint) {
   return s ? { color: adjustBrightness(s.color, s.brightness), opacity: op(s.opacity) } : { color: "#000000", opacity: 1 };
 }
 
-// ---- typing timeline -------------------------------------------------------
+// ============================================================================
+// 3. Timeline and transition calculations
+// ============================================================================
+
+// Calculates the timeline values for the typewriter effect. 
+// It builds an array of animation stops for when characters should appear/disappear based on your configured speeds and hold duration.
 function buildTimeline(sentences, mode, holdDuration, speed = 1) {
   const isChar = mode === "char";
   const ct = CHAR_TYPE / speed;
@@ -210,21 +266,52 @@ function buildTransitionCss(count, kind, hold, trans, width, fontSize) {
   return { css, dur: T };
 }
 
-
-function seededRand(seed) {
-  let s = (seed >>> 0) || 1;
-  const next = () => { s = Math.imul(s, 48271) >>> 0; return s / 4294967296; };
-  // Burn-in: a Lehmer LCG's first outputs are ~proportional to a small seed,
-  // which biased every effect's first random draw toward 0. Warm it up.
-  for (let i = 0; i < 5; i++) next();
-  return next;
+// Wraps text nodes in a group `<g>` that handles continuous loop animations (float, bob, sway, etc.) completely separate from the core transition logic.
+function buildMotion(id, index, fontSize, speed = 1) {
+  if (!id || id === "none") return null;
+  const A = Math.max(3, fontSize * 0.14);          
+  const spd = clamp(Number(speed) || 1, 0.25, 4);
+  const dur = round(4 / spd, 2);                   
+  const name = `mv${index}`;
+  const delay = round(-(index * 0.35), 2);
+  let frames;
+  switch (id) {
+    case "float": 
+      frames = `0%{transform:translate(0,0)}25%{transform:translate(${round(A * 0.6, 1)}px,${round(-A, 1)}px)}50%{transform:translate(0,${round(-A * 0.4, 1)}px)}75%{transform:translate(${round(-A * 0.6, 1)}px,${round(-A, 1)}px)}100%{transform:translate(0,0)}`;
+      break;
+    case "bob": 
+      frames = `0%,100%{transform:translateY(${round(A, 1)}px)}50%{transform:translateY(${round(-A, 1)}px)}`;
+      break;
+    case "sway": 
+      frames = `0%,100%{transform:translateX(${round(-A * 1.3, 1)}px)}50%{transform:translateX(${round(A * 1.3, 1)}px)}`;
+      break;
+    case "pulse": 
+      frames = `0%,100%{transform:scale(1)}50%{transform:scale(1.06)}`;
+      break;
+    case "wobble": 
+      frames = `0%,100%{transform:rotate(-2.2deg)}50%{transform:rotate(2.2deg)}`;
+      break;
+    case "orbit": 
+      frames = `0%{transform:translate(${round(A, 1)}px,0)}25%{transform:translate(0,${round(A, 1)}px)}50%{transform:translate(${round(-A, 1)}px,0)}75%{transform:translate(0,${round(-A, 1)}px)}100%{transform:translate(${round(A, 1)}px,0)}`;
+      break;
+    default:
+      return null;
+  }
+  const timing = id === "pulse" || id === "wobble" || id === "bob" || id === "sway"
+    ? "ease-in-out" : "linear";
+  const css =
+    `@keyframes ${name}{${frames}}` +
+    `.${name}{animation:${name} ${dur}s ${delay}s ${timing} infinite;` +
+    `transform-box:fill-box;transform-origin:center;}`;
+  return { className: name, css };
 }
 
-// ── 1. LIGHTNING ─────────────────────────────────────────────────────────────
-// Real bolt shapes: jagged polylines striking downward from the top edge, each
-// with a short branch and a soft glow underlay. Flicker is a CSS double-flash
-// with steps(1). Groups start opacity="0" and use NEGATIVE animation delays so
-// every bolt is already mid-cycle at load — no first-frame flash.
+// ============================================================================
+// 4. Effect generators
+// ============================================================================
+
+// Lightning effect: Generates jagged lines from the edges inward. 
+// We use a negative animation delay here so the bolts are already flashing when the SVG loads, avoiding an initial blank frame.
 function buildLightning(cfg, W, H, br) {
   const color  = cfg.color  || "#a78bfa";
   const o      = op(cfg.opacity  ?? 85);
@@ -232,34 +319,31 @@ function buildLightning(cfg, W, H, br) {
   const bolts  = clamp(Math.round(cfg.bolts ?? 3), 1, 6);
   const jitter = clamp(Number(cfg.jitter) || 8, 2, 20);
 
-  const cycle = round(9 / speed + 1.5, 2); // full flicker period per bolt
+  const cycle = round(9 / speed + 1.5, 2); 
   const core  = adjustBrightness(color, 165);
   const defs  = [`<clipPath id="ltClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`];
   const els   = [];
   const css   = [];
 
-  // Bolt spawns from a random EDGE (top / left / right / bottom) at a random
-  // position along it, striking inward. dir = unit vector into the banner;
-  // perp = unit vector for zigzag jitter.
   function boltPoints(r) {
     const edgeRoll = r();
     let ox, oy, dir, perp, span;
-    if (edgeRoll < 0.4) {        // top → down
+    if (edgeRoll < 0.4) {       
       ox = W * (0.08 + r() * 0.84); oy = -3;
       dir = [0, 1]; perp = [1, 0]; span = H;
-    } else if (edgeRoll < 0.6) { // bottom → up
+    } else if (edgeRoll < 0.6) { 
       ox = W * (0.08 + r() * 0.84); oy = H + 3;
       dir = [0, -1]; perp = [1, 0]; span = H;
-    } else if (edgeRoll < 0.8) { // left → right
+    } else if (edgeRoll < 0.8) { 
       ox = -3; oy = H * (0.15 + r() * 0.7);
       dir = [1, 0]; perp = [0, 1]; span = W * 0.55;
-    } else {                     // right → left
+    } else {                     
       ox = W + 3; oy = H * (0.15 + r() * 0.7);
       dir = [-1, 0]; perp = [0, 1]; span = W * 0.55;
     }
-    const segs  = 6 + Math.floor(r() * 3);          // 6-8 kinks
-    const depth = span * (0.7 + r() * 0.28);        // strike depth into banner
-    const lean  = (r() - 0.5) * 2;                  // overall sideways lean
+    const segs  = 6 + Math.floor(r() * 3);          
+    const depth = span * (0.7 + r() * 0.28);        
+    const lean  = (r() - 0.5) * 2;                  
     const pts = [[round(ox, 1), round(oy, 1)]];
     let off = 0;
     for (let i = 1; i <= segs; i++) {
@@ -278,7 +362,6 @@ function buildLightning(cfg, W, H, br) {
     const r  = seededRand(211 + b * 53);
     const { pts: main, dir, perp } = boltPoints(r);
 
-    // Branch: fork off a mid point, shorter and thinner, diverging sideways
     const fi = 2 + Math.floor(r() * (main.length - 4));
     const side = r() < 0.5 ? -1 : 1;
     const branch = [main[fi]];
@@ -295,9 +378,8 @@ function buildLightning(cfg, W, H, br) {
     const shape = (pts, w, col, alpha) =>
       `<polyline points="${toPoly(pts)}" fill="none" stroke="${col}" stroke-width="${w}" stroke-opacity="${alpha}" stroke-linejoin="round" stroke-linecap="round"/>`;
 
-    // Double-flash flicker: on → dim → on → off, then dark for the rest.
     const g = `lt${b}`;
-    const delay = round(-(r() * cycle), 2); // negative: staggered, mid-cycle at load
+    const delay = round(-(r() * cycle), 2); 
     css.push(
       `@keyframes ${g}f{0%{opacity:0}3%{opacity:1}6%{opacity:.25}9%{opacity:1}14%{opacity:0}100%{opacity:0}}`,
       `.${g}{animation:${g}f ${cycle}s ${delay}s steps(1,end) infinite}`
@@ -305,9 +387,9 @@ function buildLightning(cfg, W, H, br) {
 
     els.push(
       `<g class="${g}" opacity="0" clip-path="url(#ltClip)">` +
-      shape(main, sw * 3.2, color, round(o * 0.25, 3)) +   // glow underlay
-      shape(branch, sw * 0.7, color, round(o * 0.8, 3)) +  // branch
-      shape(main, sw, core, round(o, 3)) +                 // bright core
+      shape(main, sw * 3.2, color, round(o * 0.25, 3)) +   
+      shape(branch, sw * 0.7, color, round(o * 0.8, 3)) +  
+      shape(main, sw, core, round(o, 3)) +                 
       `</g>`
     );
   }
@@ -315,10 +397,8 @@ function buildLightning(cfg, W, H, br) {
   return { defs, els, css: css.join("\n    ") };
 }
 
-// ── 2. SOUND WAVES ───────────────────────────────────────────────────────────
-// Sine waves that TRAVEL horizontally: SMIL animates `d` through a full phase
-// cycle (0 → 2π in quarter steps, linear) so crests glide across the banner
-// instead of flapping in place. Alternating rows travel in opposite directions.
+// Sound Waves: Animating the 'd' property smoothly to travel across the banner rather than just flapping vertically. 
+// Alternate rows use opposing directions to make the effect feel dynamic.
 function buildSoundWaves(cfg, W, H, br) {
   const color  = cfg.color     || "#38bdf8";
   const o      = op(cfg.opacity ?? 45);
@@ -349,9 +429,8 @@ function buildSoundWaves(cfg, W, H, br) {
     const cycles = round(1.5 + rand() * 1.5, 2);
     const waveO  = round(o * (0.45 + (1 - t) * 0.55), 3);
     const rowDur = round(dur * (0.8 + rand() * 0.5), 2);
-    const dirSign = i % 2 === 0 ? 1 : -1; // alternate travel direction
+    const dirSign = i % 2 === 0 ? 1 : -1; 
 
-    // Phase steps: equal quarters of a full cycle → constant travel speed
     const states = [0, 1, 2, 3, 4]
       .map((k) => wavePath(cy, amp, dirSign * k * (Math.PI / 2), cycles))
       .join(";");
@@ -368,9 +447,7 @@ function buildSoundWaves(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// ── 3. PARTICLES ─────────────────────────────────────────────────────────────
-// Circles drifting upward on a gentle S-curve, fading in/out. Baseline
-// opacity="0" + negative begin → every particle mid-flight at load, no flash.
+// Particles drifting upward. Staggering negative starts ensures the effect looks completely underway by the time the first frame paints.
 function buildParticles(cfg, W, H, br) {
   const color = cfg.color  || "#f472b6";
   const o     = op(cfg.opacity ?? 70);
@@ -385,10 +462,10 @@ function buildParticles(cfg, W, H, br) {
 
   for (let i = 0; i < count; i++) {
     const cx    = round(rand() * W, 1);
-    const cy    = round(H * (0.55 + rand() * 0.5), 1);   // start low, some below edge
+    const cy    = round(H * (0.55 + rand() * 0.5), 1);   
     const r     = round(size * (0.4 + rand() * 0.8), 1);
     const dur   = round(baseDur * (0.55 + rand() * 0.75), 2);
-    const begin = round(-(rand() * dur), 2);              // negative: mid-cycle at load
+    const begin = round(-(rand() * dur), 2);              
     const sway  = round((rand() - 0.5) * W * 0.18, 1);
     const riseY = round(-(H * (0.75 + rand() * 0.45)), 1);
     const pO    = round(o * (0.55 + rand() * 0.45), 3);
@@ -407,9 +484,7 @@ function buildParticles(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// ── 4. SCANLINES ─────────────────────────────────────────────────────────────
-// Fine CRT grid (clipped to the rounded banner) + a soft glowing beam sweeping
-// top → bottom. Beam uses a NEGATIVE begin so it's mid-sweep at load.
+// Generates a CRT grid layout. We clip the grid explicitly so no lines poke weirdly out of the rounded corners.
 function buildScanlines(cfg, W, H, br) {
   const color   = cfg.color      || "#ffffff";
   const o       = op(cfg.opacity  ?? 18);
@@ -433,7 +508,6 @@ function buildScanlines(cfg, W, H, br) {
     `<clipPath id="${clipId}"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`
   );
 
-  // Static grid — clipped so lines don't poke past rounded corners
   const lineEls = [];
   for (let y = lineGap; y < H; y += lineGap) {
     lineEls.push(`<line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="${color}" stroke-width="0.5" stroke-opacity="${round(o * 0.45, 3)}"/>`);
@@ -452,9 +526,7 @@ function buildScanlines(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// ── 5. SHIMMER ───────────────────────────────────────────────────────────────
-// Diagonal gloss sweep with a dwell: the beam crosses in the first 40% of the
-// period, then rests off-screen. keyTimes-based SMIL, negative begin.
+// Creates a diagonal gloss effect using a linear gradient and custom splines to create a sweeping dwell period.
 function buildShimmer(cfg, W, H, br) {
   const color = cfg.color      || "#ffffff";
   const o     = op(cfg.opacity  ?? 55);
@@ -499,9 +571,8 @@ function buildShimmer(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// ── 6. PULSE RINGS ───────────────────────────────────────────────────────────
-// Ellipses expanding from center with a quick pop-in then long fade.
-// Baseline stroke-opacity="0" + negative begin → rings mid-expand at load.
+// Expanding circular rings. 
+// Uses splines for the pop-out sizing, fading out slowly so it feels dynamic instead of rigid.
 function buildPulseRings(cfg, W, H, br) {
   const color = cfg.color  || "#818cf8";
   const o     = op(cfg.opacity ?? 60);
@@ -518,7 +589,7 @@ function buildPulseRings(cfg, W, H, br) {
   const els   = [`<g clip-path="url(#prClip)">`];
 
   for (let i = 0; i < count; i++) {
-    const begin = round(-(i / count) * dur, 2); // negative stagger
+    const begin = round(-(i / count) * dur, 2); 
     els.push(
       `<ellipse cx="${cx}" cy="${cy}" rx="2" ry="2" fill="none" stroke="${color}" stroke-width="${sw}" stroke-opacity="0">` +
       `<animate attributeName="rx" values="2;${maxRx}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="spline" keySplines="0.25 0 0.65 1"/>` +
@@ -532,9 +603,7 @@ function buildPulseRings(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// ── 7. MATRIX RAIN ───────────────────────────────────────────────────────────
-// Falling dotted columns with bright head dots. One shared clip group; every
-// column uses a NEGATIVE begin so the rain is already falling at load.
+// Matrix rain. To create the iconic falling code look within SMIL's limits, we use dashed lines travelling downward, paired with a brighter leading "head" dot.
 function buildMatrixRain(cfg, W, H, br) {
   const color   = cfg.color    || "#4ade80";
   const o       = op(cfg.opacity ?? 55);
@@ -550,10 +619,10 @@ function buildMatrixRain(cfg, W, H, br) {
 
   for (let i = 0; i < columns; i++) {
     const cellW  = W / columns;
-    const cx     = round((i + 0.2 + rand() * 0.6) * cellW, 1); // jittered off the grid
+    const cx     = round((i + 0.2 + rand() * 0.6) * cellW, 1); 
     const colH   = round(H * (0.35 + rand() * 0.55), 1);
     const dur    = round(baseDur * (0.55 + rand() * 0.7), 2);
-    const begin  = round(-(rand() * dur), 2);                   // negative: mid-fall
+    const begin  = round(-(rand() * dur), 2);                  
     const colO   = round(o * (0.45 + rand() * 0.55), 3);
     const dashOn  = round(dotSize * 0.9, 1);
     const dashOff = round(dotSize * 1.4, 1);
@@ -576,45 +645,8 @@ function buildMatrixRain(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// ── Hue helper (local) ───────────────────────────────────────────────────────
-// Rotate a hex colour's hue by `deg` degrees. Used by confetti/aurora to build
-// small palettes anchored to the user's chosen colour.
-function hueShift(hex, deg) {
-  const { r, g, b } = hexToRgb(hex);
-  const rf = r / 255, gf = g / 255, bf = b / 255;
-  const mx = Math.max(rf, gf, bf), mn = Math.min(rf, gf, bf);
-  const l = (mx + mn) / 2;
-  let h = 0, s = 0;
-  if (mx !== mn) {
-    const d = mx - mn;
-    s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
-    if (mx === rf) h = ((gf - bf) / d + (gf < bf ? 6 : 0)) / 6;
-    else if (mx === gf) h = ((bf - rf) / d + 2) / 6;
-    else h = ((rf - gf) / d + 4) / 6;
-  }
-  h = (h + deg / 360 + 1) % 1;
-  const hue2 = (p, q, t) => {
-    t = (t + 1) % 1;
-    if (t < 1 / 6) return p + (q - p) * 6 * t;
-    if (t < 1 / 2) return q;
-    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-    return p;
-  };
-  let r2, g2, b2;
-  if (s === 0) { r2 = g2 = b2 = l; }
-  else {
-    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-    const p = 2 * l - q;
-    r2 = hue2(p, q, h + 1 / 3); g2 = hue2(p, q, h); b2 = hue2(p, q, h - 1 / 3);
-  }
-  return rgbToHex(r2 * 255, g2 * 255, b2 * 255);
-}
-
-// ── 8. BORDER BEAM ───────────────────────────────────────────────────────────
-// Glowing comet(s) orbiting the banner's border. A rounded rect with
-// pathLength="100" gets a dash pattern; SMIL animates stroke-dashoffset so the
-// dash travels around the perimeter. Three stacked strokes (wide faint glow,
-// mid tail, bright head segment) fake a fading comet tail.
+// Border beam. We use the pathLength property combined with stroke-dashoffset to easily drive dashes around our perimeter.
+// Stacking different stroke thicknesses lets us fake a glowing tail for the comet.
 function buildBorderBeam(cfg, W, H, br) {
   const color = cfg.color || "#38bdf8";
   const o     = op(cfg.opacity ?? 90);
@@ -623,7 +655,6 @@ function buildBorderBeam(cfg, W, H, br) {
   const thick = clamp(Number(cfg.thickness) || 3, 1, 8);
 
   const seg   = 100 / count;
-  // Clamp tail so adjacent comets never run into each other.
   const tail  = Math.min(clamp(Number(cfg.tailLength) || 18, 5, 40), round(seg * 0.8, 2));
 
   const dur   = round(24 / speed, 2);
@@ -632,10 +663,6 @@ function buildBorderBeam(cfg, W, H, br) {
   const rx    = Math.max(0, br - inset);
   const rectAttrs = `x="${round(inset, 1)}" y="${round(inset, 1)}" width="${round(W - inset * 2, 1)}" height="${round(H - inset * 2, 1)}" rx="${round(rx, 1)}" fill="none" pathLength="100" stroke-linecap="round"`;
 
-  // A dash of length `len` occupies path positions [-offset, -offset + len];
-  // animating the offset downward moves it FORWARD along the path. Every layer
-  // sets offset = len - tail so all leading edges align at position `tail` —
-  // the bright head sits at the FRONT and longer, fainter layers trail behind.
   const layer = (len, w, col, alpha) => {
     const on    = round(Math.min(len, seg * 0.9), 2);
     const shift = round(on - tail, 2);
@@ -647,25 +674,21 @@ function buildBorderBeam(cfg, W, H, br) {
     );
   };
 
-  // Clip to the banner's rounded rect so the wide glow stroke can't spill
-  // outside the shape (the "transparent border" halo at high thickness).
   const defs = [`<clipPath id="bbClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`];
   const els = [
     `<g clip-path="url(#bbClip)">`,
-    layer(tail,        thick * 2.4, color, o * 0.16),   // soft glow underlay
-    layer(tail,        thick,       color, o * 0.22),   // faint far tail
-    layer(tail * 0.62, thick,       color, o * 0.4),    // mid tail
-    layer(tail * 0.34, thick,       color, o * 0.65),   // near tail
-    layer(tail * 0.14, thick,       head,  o),          // bright head (front)
+    layer(tail,        thick * 2.4, color, o * 0.16),   
+    layer(tail,        thick,       color, o * 0.22),   
+    layer(tail * 0.62, thick,       color, o * 0.4),    
+    layer(tail * 0.34, thick,       color, o * 0.65),   
+    layer(tail * 0.14, thick,       head,  o),          
     `</g>`,
   ];
 
   return { defs, els, css: "" };
 }
 
-// ── 9. SPARKLES ──────────────────────────────────────────────────────────────
-// Classic 4-point star sparkles that twinkle in place: scale pop + opacity
-// pulse, staggered with negative begins. Baseline opacity="0" → no flash.
+// 4-point star sparkles. Uses simple SVG paths popping scale and opacity via SMIL keyTimes.
 function buildSparkles(cfg, W, H, br) {
   const color = cfg.color || "#fde047";
   const o     = op(cfg.opacity ?? 85);
@@ -678,7 +701,6 @@ function buildSparkles(cfg, W, H, br) {
   const defs = [`<clipPath id="spClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`];
   const els  = [`<g clip-path="url(#spClip)">`];
 
-  // Concave 4-point star centred on the origin, radius s
   const starPath = (s) => {
     const q = round(s * 0.18, 2);
     return `M 0 ${-s} Q ${q} ${-q} ${s} 0 Q ${q} ${q} 0 ${s} Q ${-q} ${q} ${-s} 0 Q ${-q} ${-q} 0 ${-s} Z`;
@@ -707,10 +729,7 @@ function buildSparkles(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// ── 10. CONFETTI ─────────────────────────────────────────────────────────────
-// Small rectangles tumbling downward with sideways sway. A 4-colour palette is
-// derived from the base colour via hue rotation. Pieces start above the banner
-// (clipped) and use negative begins → already raining at load.
+// Generates an array of falling confetti blocks. We assign colours automatically generated from the user's base tint.
 function buildConfetti(cfg, W, H, br) {
   const color = cfg.color || "#f472b6";
   const o     = op(cfg.opacity ?? 90);
@@ -753,16 +772,13 @@ function buildConfetti(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// ── 11. AURORA ───────────────────────────────────────────────────────────────
-// Soft, blurred colour blobs drifting slowly behind the text — northern-lights
-// haze. Blobs use hue-shifted shades of the base colour, a shared Gaussian
-// blur, slow SMIL drift and gentle opacity breathing. Negative begins.
+// Aurora drift. We use SVGs gaussian blur here along with hue shifting to create organic feeling back-glow blobs.
 function buildAurora(cfg, W, H, br) {
   const color = cfg.color || "#22d3ee";
   const o     = op(cfg.opacity ?? 45);
   const speed = clamp(Number(cfg.speed) || 2, 1, 10);
   const blobs = clamp(Math.round(cfg.blobs ?? 3), 1, 4);
-  const size  = clamp(Number(cfg.size) || 60, 30, 120);   // % of banner height
+  const size  = clamp(Number(cfg.size) || 60, 30, 120);   
 
   const rand    = seededRand(41);
   const baseDur = round(40 / speed, 2);
@@ -798,9 +814,7 @@ function buildAurora(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// ── 12. Blur light ────────────────────────────────────────────────────────────────
-// Soft out-of-focus orbs drifting slowly upward. Three shared Gaussian blur
-// levels fake depth of field; opacity breathing + negative begins, no flash.
+// Uses stacking blurs at different rates to create a simulated depth-of-field effect.
 function buildBlurlight(cfg, W, H, br) {
   const color = cfg.color || "#fbbf24";
   const o     = op(cfg.opacity ?? 45);
@@ -819,7 +833,7 @@ function buildBlurlight(cfg, W, H, br) {
   const els = [`<g clip-path="url(#bkClip)">`];
 
   for (let i = 0; i < count; i++) {
-    const depth = i % 3;                                   // 0 sharp … 2 blurry
+    const depth = i % 3;                                   
     const x     = round(W * (0.04 + rand() * 0.92), 1);
     const y     = round(H * (0.35 + rand() * 0.6), 1);
     const r     = round(size * (0.5 + rand() * 1.1) * (1 + depth * 0.45), 1);
@@ -841,19 +855,15 @@ function buildBlurlight(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// ── 13. SYNTHWAVE GRID ───────────────────────────────────────────────────────
-// Retro 3D wireframe floor: static verticals fan out from a vanishing point,
-// horizontal lines scroll toward the viewer along a quadratic (perspective)
-// easing sampled into SMIL `values`. A vertical fade gradient on the strokes
-// dissolves everything into the horizon. Negative begins pre-bake positions.
+// Grid generation using simple geometry and SMIL perspective easing for that synthwave infinite floor aesthetic.
 function buildSynthGrid(cfg, W, H, br) {
   const color = cfg.color || "#ff2d95";
   const o     = op(cfg.opacity ?? 55);
   const speed = clamp(Number(cfg.speed) || 4, 1, 10);
-  const cols  = clamp(Math.round(cfg.columns ?? 7), 3, 12);   // per side
+  const cols  = clamp(Math.round(cfg.columns ?? 7), 3, 12);   
   const rows  = clamp(Math.round(cfg.rows ?? 5), 2, 8);
 
-  const yH   = round(H * 0.52, 1);        // horizon
+  const yH   = round(H * 0.52, 1);        
   const cx   = round(W / 2, 1);
   const dur  = round(10 / speed, 2);
   const defs = [
@@ -866,17 +876,14 @@ function buildSynthGrid(cfg, W, H, br) {
   ];
   const els = [`<g clip-path="url(#sgClip)">`];
 
-  // Static converging verticals (mirrored around the centre).
   const spread = W / (cols * 0.9);
   for (let i = -cols; i <= cols; i++) {
     if (i === 0) continue;
     const bx = round(cx + i * spread, 1);
     els.push(`<line x1="${cx}" y1="${yH}" x2="${bx}" y2="${H}" stroke="url(#sgFade)" stroke-width="1"/>`);
   }
-  // Horizon glow line.
   els.push(`<line x1="0" y1="${yH}" x2="${W}" y2="${yH}" stroke="${color}" stroke-opacity="${round(o * 0.5, 3)}" stroke-width="1.5"/>`);
 
-  // Scrolling horizontals: y(t) = yH + (H − yH)·t², sampled for SMIL.
   const samples = 13;
   const ys = [];
   for (let k = 0; k < samples; k++) {
@@ -898,17 +905,13 @@ function buildSynthGrid(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// ── 14. STARFIELD (WARP) ─────────────────────────────────────────────────────
-// Streaks shooting from the centre to the edges — hyperspace jump. Each ray is
-// a line with pathLength="100"; a short dash travels start→end via animated
-// stroke-dashoffset with an ease-in spline (accelerating outward). Dash starts
-// fully off-path (offset = streak length) → invisible baseline, no flash.
+// The starfield streaks use a similar trick to the border beam, shooting out rapidly via stroke-dashoffset on invisible lines.
 function buildStarfield(cfg, W, H, br) {
   const color  = cfg.color || "#dbeafe";
   const o      = op(cfg.opacity ?? 70);
   const speed  = clamp(Number(cfg.speed) || 5, 1, 10);
   const count  = clamp(Math.round(cfg.count ?? 18), 6, 40);
-  const streak = clamp(Number(cfg.streak) || 14, 5, 30);   // % of ray length
+  const streak = clamp(Number(cfg.streak) || 14, 5, 30);   
 
   const rand    = seededRand(1201);
   const baseDur = round(7 / speed, 2);
@@ -943,10 +946,7 @@ function buildStarfield(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// ── 15. CRT VIGNETTE ─────────────────────────────────────────────────────────
-// Radial darkening toward the edges + a subtle discrete opacity flicker, like
-// a failing CRT. Renders last in the effect stack so it sits over the other
-// effects. Pairs with scanlines.
+// Sits at the top of the effect stack providing edge darkening and subtle opacity steps(1) flickers.
 function buildVignette(cfg, W, H, br) {
   const color   = cfg.color || "#000000";
   const o       = op(cfg.opacity ?? 60);
@@ -980,56 +980,10 @@ function buildVignette(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// ── Text motion (per-sentence) ───────────────────────────────────────────────
-// A subtle looping transform applied to a <g> WRAPPING each text element, so it
-// composes cleanly with the text's own transition (clip-path for typing, CSS
-// transforms for crossfades) instead of fighting it. Returns { className, css }
-// or null for "none". amplitude scales with font size so motion reads the same
-// at any size. Uses ease-in-out keyframes for organic, non-mechanical motion.
+// ============================================================================
+// 5. Dispatcher and main generator
+// ============================================================================
 
-function buildMotion(id, index, fontSize, speed = 1) {
-  if (!id || id === "none") return null;
-  const A = Math.max(3, fontSize * 0.14);          // base amplitude in px
-  const spd = clamp(Number(speed) || 1, 0.25, 4);
-  const dur = round(4 / spd, 2);                   // slower = calmer
-  const name = `mv${index}`;
-  // Slight per-sentence phase offset so stacked lines don't move in lockstep.
-  const delay = round(-(index * 0.35), 2);
-  let frames;
-  switch (id) {
-    case "float": // diagonal drifting loop
-      frames = `0%{transform:translate(0,0)}25%{transform:translate(${round(A * 0.6, 1)}px,${round(-A, 1)}px)}50%{transform:translate(0,${round(-A * 0.4, 1)}px)}75%{transform:translate(${round(-A * 0.6, 1)}px,${round(-A, 1)}px)}100%{transform:translate(0,0)}`;
-      break;
-    case "bob": // vertical up/down
-      frames = `0%,100%{transform:translateY(${round(A, 1)}px)}50%{transform:translateY(${round(-A, 1)}px)}`;
-      break;
-    case "sway": // horizontal left/right
-      frames = `0%,100%{transform:translateX(${round(-A * 1.3, 1)}px)}50%{transform:translateX(${round(A * 1.3, 1)}px)}`;
-      break;
-    case "pulse": // gentle zoom in/out
-      frames = `0%,100%{transform:scale(1)}50%{transform:scale(1.06)}`;
-      break;
-    case "wobble": // rocking rotation
-      frames = `0%,100%{transform:rotate(-2.2deg)}50%{transform:rotate(2.2deg)}`;
-      break;
-    case "orbit": // small circular path
-      frames = `0%{transform:translate(${round(A, 1)}px,0)}25%{transform:translate(0,${round(A, 1)}px)}50%{transform:translate(${round(-A, 1)}px,0)}75%{transform:translate(0,${round(-A, 1)}px)}100%{transform:translate(${round(A, 1)}px,0)}`;
-      break;
-    default:
-      return null;
-  }
-  const timing = id === "pulse" || id === "wobble" || id === "bob" || id === "sway"
-    ? "ease-in-out" : "linear";
-  const css =
-    `@keyframes ${name}{${frames}}` +
-    `.${name}{animation:${name} ${dur}s ${delay}s ${timing} infinite;` +
-    // transform-box keeps scale/rotate centred on the text's own box, not the
-    // SVG origin, so pulse/wobble/orbit pivot around the glyphs.
-    `transform-box:fill-box;transform-origin:center;}`;
-  return { className: name, css };
-}
-
-// ── Master dispatcher ────────────────────────────────────────────────────────
 function buildEffects(effects, W, H, br) {
   if (!effects || !effects.length) return { defs: [], els: [], css: "" };
   const allDefs = [], allEls = [], allCss = [];
@@ -1123,11 +1077,8 @@ export function generateSvg(config) {
   });
   const justifyAttr = (g) => (g.justified ? ` textLength="${round(g.width, 2)}" lengthAdjust="spacing"` : "");
 
-  // Per-sentence text motion (wraps each <text> in an animated <g>). Built once
-  // here so every transition branch can reuse it. motions[i] is null for "none".
   const motions = geo.map((g, i) => buildMotion(g.motion, i, fontSize, motionSpeed));
   const motionCss = motions.filter(Boolean).map((m) => m.css).join("\n    ");
-  // Wrap `el` (a <text> string) in its motion group if the sentence has motion.
   const withMotion = (el, i) =>
     motions[i] ? `<g class="${motions[i].className}">${el}</g>` : el;
 
@@ -1144,7 +1095,6 @@ export function generateSvg(config) {
     </filter>`);
   }
 
-  // Build effects (rendered between background and text)
   const effResult = buildEffects(effects, width, height, br);
   defs.push(...effResult.defs);
 
@@ -1171,7 +1121,6 @@ export function generateSvg(config) {
   const effEls = effResult.els.join("\n  ");
   const effCss = effResult.css;
 
-  // ---- typing transition ---------------------------------------------------
   if (transition === "typing") {
     const mode = typingMode === "char" ? "char" : "smooth";
     const calcMode = mode === "char" ? "discrete" : "linear";
@@ -1210,7 +1159,6 @@ export function generateSvg(config) {
     return wrap(width, height, geo[0].text, inner, linkUrl);
   }
 
-  // ---- single sentence, non-typing -----------------------------------------
   if (liveCount <= 1) {
     const g0 = geo[0];
     const inner = [
@@ -1223,7 +1171,6 @@ export function generateSvg(config) {
     return wrap(width, height, g0.text, inner, linkUrl);
   }
 
-  // ---- crossfade-style transitions -----------------------------------------
   const trans = transition === "none" ? 0.05 : clamp(Number(transitionDuration) || 0.6, 0.05, 3);
   const { css: transCss } = buildTransitionCss(liveCount, transition, Math.max(0.1, Number(holdDuration) || 1.5), trans, width, fontSize);
   const transTexts = geo.map(
@@ -1238,6 +1185,10 @@ export function generateSvg(config) {
   ].filter(Boolean).join("\n  ");
   return wrap(width, height, geo[0].text, inner, linkUrl);
 }
+
+// ----------------------------------------------------------------------------
+// MISCELLANEOUS UTILITIES
+// ----------------------------------------------------------------------------
 
 function wrap(width, height, label, inner, linkUrl = "") {
   const link = normalizeUrl(linkUrl);
