@@ -2,8 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { generateSvg, adjustBrightness, autoSize, normalizeUrl } from "./generateSvg";
 import "./App.css";
 
-// Real text measurement (needs the DOM, so it stays out of generateSvg).
-// The font family must match what the SVG renders or the typing reveal drifts.
+// ============================================================================
+// 1. Utilities
+// ============================================================================
+
+// We need the DOM to measure text accurately, so this stays out of the SVG generation logic.
+// Heads up: The font family here must perfectly match what the SVG renders, otherwise the typewriter reveal animation will drift off sync.
 function measureTextWidth(text, fontSize, fontWeight, fontFamily) {
   const canvas =
     measureTextWidth._c || (measureTextWidth._c = document.createElement("canvas"));
@@ -12,13 +16,89 @@ function measureTextWidth(text, fontSize, fontWeight, fontFamily) {
   return Math.ceil(ctx.measureText(text || " ").width);
 }
 
-// Cumulative width after each character — needed for the "one letter at a time"
-// typing mode so the reveal lands exactly on each character boundary.
+// Calculates the width of the text as each character is added. 
+// This is critical for the "letter by letter" typing mode to ensure the clip-path reveals land exactly on character boundaries.
 function measureSentence(text, fontSize, fontWeight, fontFamily) {
   const prefixes = [0];
   for (let k = 1; k <= text.length; k++) prefixes.push(measureTextWidth(text.slice(0, k), fontSize, fontWeight, fontFamily));
   return { text, width: prefixes[prefixes.length - 1] || measureTextWidth(text, fontSize, fontWeight, fontFamily), prefixes };
 }
+
+function bufferToBase64(buf) {
+  const bytes = new Uint8Array(buf);
+  let bin = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  return btoa(bin);
+}
+
+// Parses the Google Fonts CSS2 response to extract the basic-latin woff2 file URL.
+function pickLatinFace(css) {
+  const re = /\/\*\s*([\w-]+)\s*\*\/\s*@font-face\s*{([^}]*)}/g;
+  const found = [];
+  let m;
+  while ((m = re.exec(css))) {
+    const body = m[2];
+    const url = (body.match(/url\((https:\/\/[^)]+\.woff2)\)/) || [])[1];
+    if (!url) continue;
+    found.push({
+      label: m[1],
+      url,
+      // eslint-disable-next-line no-sparse-arrays
+      weight: (body.match(/font-weight:\s*([^;]+);/) || [, "400"])[1].trim(),
+      // eslint-disable-next-line no-sparse-arrays
+      style: (body.match(/font-style:\s*([^;]+);/) || [, "normal"])[1].trim(),
+    });
+  }
+  if (found.length) return found.find((f) => f.label === "latin") || found[0];
+  const url = (css.match(/url\((https:\/\/[^)]+\.woff2)\)/) || [])[1];
+  return url ? { url, weight: "400", style: "normal" } : null;
+}
+
+// Handles fetching a Google font, embedding it as a base64 string, and loading it into the DOM so we can measure it accurately.
+// It returns a ready-to-inline CSS string so the final SVG stays entirely self-contained.
+async function loadGoogleFont(family) {
+  const res = await fetch(`https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}&display=swap`);
+  if (!res.ok) throw new Error(`Couldn't find "${family}" on Google Fonts.`);
+  const face = pickLatinFace(await res.text());
+  if (!face) throw new Error("That font has no usable web file.");
+  const fontRes = await fetch(face.url);
+  if (!fontRes.ok) throw new Error("Couldn't download the font file.");
+  const dataUrl = `data:font/woff2;base64,${bufferToBase64(await fontRes.arrayBuffer())}`;
+  const css = `@font-face { font-family: '${family}'; font-style: ${face.style}; font-weight: ${face.weight}; font-display: block; src: url('${dataUrl}') format('woff2'); }`;
+  try {
+    const ff = new FontFace(family, `url(${dataUrl})`);
+    await ff.load();
+    document.fonts.add(ff);
+  } catch {
+    // If it fails, measurement might be slightly off in the browser, but the embedded SVG still renders
+  }
+  return { family, css };
+}
+
+// Bolds the matched query within the autocomplete dropdown, similar to how word processors do it.
+function highlightMatch(name, query) {
+  const q = query.trim();
+  if (!q) return name;
+  const idx = name.toLowerCase().indexOf(q.toLowerCase());
+  if (idx === -1) return name;
+  return (
+    <>
+      {name.slice(0, idx)}
+      <b>{name.slice(idx, idx + q.length)}</b>
+      {name.slice(idx + q.length)}
+    </>
+  );
+}
+
+// Resolves the active CSS font-family string. 
+// If it's a fetched Google font, it gets rendered under its real family name with a fallback to the default system stack.
+const familyFor = (fontId, embedFont) =>
+  embedFont ? `'${embedFont.family}', ${FONTS[0].stack}` : (FONTS.find((f) => f.id === fontId) || FONTS[0]).stack;
+
+// ============================================================================
+// 2. Constants
+// ============================================================================
 
 const TABS = [
   { id: "text", label: "Text" },
@@ -28,9 +108,9 @@ const TABS = [
 ];
 
 const MAX_SENTENCES = 6;
+const MAX_STOPS = 8;
 
-// Default fonts are system-font stacks: they need no embedding and render on the
-// viewer's machine (external web fonts don't load through GitHub's image proxy).
+// We use system fonts by default. They don't require external fetching, which is ideal since GitHub's image proxy often blocks external web fonts from loading.
 const FONTS = [
   { id: "sans", label: "Sans", stack: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" },
   { id: "serif", label: "Serif", stack: "Georgia, 'Times New Roman', Times, serif" },
@@ -39,14 +119,14 @@ const FONTS = [
   { id: "condensed", label: "Condensed", stack: "'Arial Narrow', 'Helvetica Neue', Arial, sans-serif" },
 ];
 
-// A few popular Google Fonts shown as quick-pick chips.
+// Quick-pick chips for popular Google Fonts to save users time.
 const GOOGLE_FONTS = [
   "Inter", "Poppins", "Montserrat", "Roboto Slab", "Playfair Display",
   "Lobster", "Pacifico", "Bebas Neue", "Caveat", "Fira Code",
 ];
 
-// A larger catalogue of popular Google Fonts, used only to suggest names as the
-// user types. Any name can still be loaded even if it's not in this list.
+// A larger catalogue used purely for the autocomplete suggestions as the user types. 
+// Note: Users can still load fonts not on this list if they type the exact name.
 const FONT_LIBRARY = [
   "Abril Fatface", "Albert Sans", "Alegreya", "Alegreya Sans", "Amatic SC", "Anton",
   "Archivo", "Archivo Black", "Arvo", "Assistant", "Audiowide", "Baloo 2", "Barlow",
@@ -72,82 +152,6 @@ const FONT_LIBRARY = [
   "Varela Round", "Vollkorn", "Work Sans", "Yeseva One", "Zilla Slab",
 ];
 
-// Resolve the active CSS font-family string (used for both in-browser
-// measurement and the generated SVG). A fetched Google font is rendered under
-// its real family name with a system fallback.
-const familyFor = (fontId, embedFont) =>
-  embedFont ? `'${embedFont.family}', ${FONTS[0].stack}` : (FONTS.find((f) => f.id === fontId) || FONTS[0]).stack;
-
-// --- Google Fonts: fetch + base64-embed (so the SVG stays self-contained) ----
-function bufferToBase64(buf) {
-  const bytes = new Uint8Array(buf);
-  let bin = "";
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
-  return btoa(bin);
-}
-
-// From a Google Fonts CSS2 response, pick the basic-latin woff2 face.
-function pickLatinFace(css) {
-  const re = /\/\*\s*([\w-]+)\s*\*\/\s*@font-face\s*{([^}]*)}/g;
-  const found = [];
-  let m;
-  while ((m = re.exec(css))) {
-    const body = m[2];
-    const url = (body.match(/url\((https:\/\/[^)]+\.woff2)\)/) || [])[1];
-    if (!url) continue;
-    found.push({
-      label: m[1],
-      url,
-      // eslint-disable-next-line no-sparse-arrays
-      weight: (body.match(/font-weight:\s*([^;]+);/) || [, "400"])[1].trim(),
-      // eslint-disable-next-line no-sparse-arrays
-      style: (body.match(/font-style:\s*([^;]+);/) || [, "normal"])[1].trim(),
-    });
-  }
-  if (found.length) return found.find((f) => f.label === "latin") || found[0];
-  const url = (css.match(/url\((https:\/\/[^)]+\.woff2)\)/) || [])[1];
-  return url ? { url, weight: "400", style: "normal" } : null;
-}
-
-// Fetch a Google font by family name, embed it, and load it for measurement.
-// Returns { family, css } where css is the ready-to-inline @font-face rule.
-async function loadGoogleFont(family) {
-  const res = await fetch(`https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}&display=swap`);
-  if (!res.ok) throw new Error(`Couldn't find "${family}" on Google Fonts.`);
-  const face = pickLatinFace(await res.text());
-  if (!face) throw new Error("That font has no usable web file.");
-  const fontRes = await fetch(face.url);
-  if (!fontRes.ok) throw new Error("Couldn't download the font file.");
-  const dataUrl = `data:font/woff2;base64,${bufferToBase64(await fontRes.arrayBuffer())}`;
-  const css = `@font-face { font-family: '${family}'; font-style: ${face.style}; font-weight: ${face.weight}; font-display: block; src: url('${dataUrl}') format('woff2'); }`;
-  try {
-    const ff = new FontFace(family, `url(${dataUrl})`);
-    await ff.load();
-    document.fonts.add(ff);
-  } catch {
-    /* measurement may be approximate, but the embedded SVG still renders */
-  }
-  return { family, css };
-}
-
-// Bold the matched portion of a suggestion (case-insensitive), Word-style.
-function highlightMatch(name, query) {
-  const q = query.trim();
-  if (!q) return name;
-  const idx = name.toLowerCase().indexOf(q.toLowerCase());
-  if (idx === -1) return name;
-  return (
-    <>
-      {name.slice(0, idx)}
-      <b>{name.slice(idx, idx + q.length)}</b>
-      {name.slice(idx + q.length)}
-    </>
-  );
-}
-
-// Sentence-switch transitions. "typing" is the typewriter; the rest are CSS
-// crossfade styles. "none" is an instant cut.
 const TRANSITIONS = [
   { id: "none", label: "None" },
   { id: "typing", label: "Typing" },
@@ -158,8 +162,6 @@ const TRANSITIONS = [
   { id: "blur", label: "Blur" },
 ];
 
-// Per-sentence text alignment. "justify" stretches multi-word sentences to fill
-// the banner band (single words fall back to left in generateSvg).
 const ALIGNMENTS = [
   { id: "left", label: "Align left" },
   { id: "center", label: "Align center" },
@@ -167,7 +169,185 @@ const ALIGNMENTS = [
   { id: "justify", label: "Justify" },
 ];
 
-// Tiny inline icon (three bars) illustrating each alignment.
+const MOTIONS = [
+  { id: "none",   label: "No motion" },
+  { id: "float",  label: "Float" },
+  { id: "bob",    label: "Bob (up/down)" },
+  { id: "sway",   label: "Sway (left/right)" },
+  { id: "pulse",  label: "Pulse (zoom)" },
+  { id: "wobble", label: "Wobble (rock)" },
+  { id: "orbit",  label: "Orbit (circle)" },
+];
+
+// ============================================================================
+// 3. Defaults and metadata
+// ============================================================================
+
+const EFFECT_DEFAULTS = [
+  { id: "lightning",  enabled: false, color: "#a78bfa", opacity: 85, speed: 5,  bolts: 3,   jitter: 8   },
+  { id: "soundwaves", enabled: false, color: "#38bdf8", opacity: 45, speed: 4,  count: 4,   strokeWidth: 1.5 },
+  { id: "particles",  enabled: false, color: "#f472b6", opacity: 70, speed: 3,  count: 15,  size: 3     },
+  { id: "scanlines",  enabled: false, color: "#ffffff", opacity: 18, speed: 3,  lineGap: 4, beamHeight: 36  },
+  { id: "shimmer",    enabled: false, color: "#ffffff", opacity: 55, speed: 3,  beamWidth: 100 },
+  { id: "pulserings", enabled: false, color: "#818cf8", opacity: 60, speed: 3,  count: 3,   strokeWidth: 1.5 },
+  { id: "matrixrain", enabled: false, color: "#4ade80", opacity: 55, speed: 5,  columns: 12, dotSize: 3  },
+  { id: "borderbeam", enabled: false, color: "#38bdf8", opacity: 90, speed: 4,  count: 1,   tailLength: 18, thickness: 3 },
+  { id: "sparkles",   enabled: false, color: "#fde047", opacity: 85, speed: 4,  count: 10,  size: 5 },
+  { id: "confetti",   enabled: false, color: "#f472b6", opacity: 90, speed: 4,  count: 18,  size: 5 },
+  { id: "aurora",     enabled: false, color: "#22d3ee", opacity: 45, speed: 2,  blobs: 3,   size: 60 },
+  { id: "blurrylights",      enabled: false, color: "#fbbf24", opacity: 45, speed: 2,  count: 10,  size: 10 },
+  { id: "synthgrid",  enabled: false, color: "#ff2d95", opacity: 55, speed: 4,  columns: 7, rows: 5 },
+  { id: "starfield",  enabled: false, color: "#dbeafe", opacity: 70, speed: 5,  count: 18,  streak: 14 },
+  { id: "vignette",   enabled: false, color: "#000000", opacity: 60, speed: 5,  flicker: 25 },
+];
+
+const EFFECT_META = [
+  {
+    id: "lightning",
+    label: "Lightning",
+    desc: "Zigzag bolts flicker along the banner edges",
+    controls: [
+      { key: "bolts",  label: "Bolts",  type: "int",   min: 1, max: 6,  step: 1 },
+      { key: "jitter", label: "Jitter", type: "float", min: 2, max: 20, step: 1, fmt: v => `${v}px` },
+    ],
+  },
+  {
+    id: "soundwaves",
+    label: "Sound Waves",
+    desc: "Sine waves ripple horizontally across the banner",
+    controls: [
+      { key: "count",       label: "Waves",     type: "int",   min: 1, max: 8,  step: 1 },
+      { key: "strokeWidth", label: "Thickness", type: "float", min: 0.5, max: 4, step: 0.5, fmt: v => `${v}px` },
+    ],
+  },
+  {
+    id: "particles",
+    label: "Particles",
+    desc: "Glowing sparks drift upward and fade out",
+    controls: [
+      { key: "count", label: "Count", type: "int",   min: 3, max: 40, step: 1 },
+      { key: "size",  label: "Size",  type: "float", min: 1, max: 10, step: 0.5, fmt: v => `${v}px` },
+    ],
+  },
+  {
+    id: "scanlines",
+    label: "Scanlines",
+    desc: "CRT grid with a glowing beam sweeping top to bottom",
+    controls: [
+      { key: "lineGap",    label: "Line gap",    type: "int", min: 2, max: 20, step: 1, fmt: v => `${v}px` },
+      { key: "beamHeight", label: "Beam height", type: "int", min: 8, max: 100, step: 4, fmt: v => `${v}px` },
+    ],
+  },
+  {
+    id: "shimmer",
+    label: "Shimmer",
+    desc: "Diagonal gloss highlight sweeps across the banner",
+    controls: [
+      { key: "beamWidth", label: "Beam width", type: "int", min: 20, max: 300, step: 10, fmt: v => `${v}px` },
+    ],
+  },
+  {
+    id: "pulserings",
+    label: "Pulse Rings",
+    desc: "Rings expand outward from the center and fade",
+    controls: [
+      { key: "count",       label: "Rings",     type: "int",   min: 1, max: 8,  step: 1 },
+      { key: "strokeWidth", label: "Thickness", type: "float", min: 0.5, max: 4, step: 0.5, fmt: v => `${v}px` },
+    ],
+  },
+  {
+    id: "matrixrain",
+    label: "Matrix Rain",
+    desc: "Columns of glowing dots rain downward",
+    controls: [
+      { key: "columns", label: "Columns",  type: "int",   min: 3, max: 30, step: 1 },
+      { key: "dotSize", label: "Dot size", type: "float", min: 1, max: 8,  step: 0.5, fmt: v => `${v}px` },
+    ],
+  },
+  {
+    id: "borderbeam",
+    label: "Border Beam",
+    desc: "Glowing comets orbit around the banner's border",
+    controls: [
+      { key: "count",      label: "Comets",    type: "int",   min: 1, max: 4,  step: 1 },
+      { key: "tailLength", label: "Tail",      type: "int",   min: 5, max: 40, step: 1, fmt: v => `${v}%` },
+      { key: "thickness",  label: "Thickness", type: "float", min: 1, max: 8,  step: 0.5, fmt: v => `${v}px` },
+    ],
+  },
+  {
+    id: "sparkles",
+    label: "Sparkles",
+    desc: "Four-point stars twinkle in and out across the banner",
+    controls: [
+      { key: "count", label: "Count", type: "int",   min: 3, max: 30, step: 1 },
+      { key: "size",  label: "Size",  type: "float", min: 2, max: 12, step: 0.5, fmt: v => `${v}px` },
+    ],
+  },
+  {
+    id: "confetti",
+    label: "Confetti",
+    desc: "Colourful pieces tumble down, hues derived from your colour",
+    controls: [
+      { key: "count", label: "Count", type: "int",   min: 5, max: 40, step: 1 },
+      { key: "size",  label: "Size",  type: "float", min: 2, max: 10, step: 0.5, fmt: v => `${v}px` },
+    ],
+  },
+  {
+    id: "aurora",
+    label: "Aurora",
+    desc: "Soft blurred colour blobs drift slowly behind the text",
+    controls: [
+      { key: "blobs", label: "Blobs", type: "int", min: 1, max: 4,   step: 1 },
+      { key: "size",  label: "Size",  type: "int", min: 30, max: 120, step: 5, fmt: v => `${v}%` },
+    ],
+  },
+  {
+    id: "blurrylights",
+    label: "Blurry lights",
+    desc: "Soft out-of-focus orbs drift slowly upward",
+    controls: [
+      { key: "count", label: "Orbs", type: "int", min: 3, max: 25, step: 1 },
+      { key: "size",  label: "Size", type: "int", min: 4, max: 24, step: 1, fmt: v => `${v}px` },
+    ],
+  },
+  {
+    id: "synthgrid",
+    label: "Synthwave Grid",
+    desc: "Retro 3D wireframe floor scrolls toward the viewer",
+    controls: [
+      { key: "columns", label: "Columns", type: "int", min: 3, max: 12, step: 1 },
+      { key: "rows",    label: "Rows",    type: "int", min: 2, max: 8,  step: 1 },
+    ],
+  },
+  {
+    id: "starfield",
+    label: "Starfield",
+    desc: "Hyperspace streaks shoot from the centre outward",
+    controls: [
+      { key: "count",  label: "Streaks", type: "int", min: 6, max: 40, step: 1 },
+      { key: "streak", label: "Length",  type: "int", min: 5, max: 30, step: 1, fmt: v => `${v}%` },
+    ],
+  },
+  {
+    id: "vignette",
+    label: "CRT Vignette",
+    desc: "Edges darken with a subtle CRT flicker — pairs with scanlines",
+    controls: [
+      { key: "flicker", label: "Flicker", type: "int", min: 0, max: 100, step: 5, fmt: v => `${v}%` },
+    ],
+  },
+];
+
+const EFFECT_GROUPS = [
+  { title: "Ambient",  ids: ["aurora", "blurrylights", "shimmer", "scanlines", "vignette", "sparkles"] },
+  { title: "Motion",   ids: ["particles", "confetti", "matrixrain", "soundwaves", "synthgrid", "starfield"] },
+  { title: "Accent",   ids: ["lightning", "pulserings", "borderbeam"] },
+];
+
+// ============================================================================
+// 4. Reusable UI components
+// ============================================================================
+
 function AlignIcon({ type }) {
   const rows = {
     left: [[2, 14], [2, 9], [2, 11]],
@@ -185,18 +365,6 @@ function AlignIcon({ type }) {
   );
 }
 
-// ---- text motion (per-sentence, layered on top of transitions) ----
-const MOTIONS = [
-  { id: "none",   label: "No motion" },
-  { id: "float",  label: "Float" },
-  { id: "bob",    label: "Bob (up/down)" },
-  { id: "sway",   label: "Sway (left/right)" },
-  { id: "pulse",  label: "Pulse (zoom)" },
-  { id: "wobble", label: "Wobble (rock)" },
-  { id: "orbit",  label: "Orbit (circle)" },
-];
-
-// Tiny inline glyph illustrating each motion preset.
 function MotionIcon({ type }) {
   const c = "currentColor";
   const common = { width: 16, height: 16, viewBox: "0 0 16 16", fill: "none", stroke: c, strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true };
@@ -212,16 +380,15 @@ function MotionIcon({ type }) {
   }
 }
 
-// ---- paint factories ------------------------------------------------------
+// Helpers for initializing and managing our color objects (paints).
 const uid = () => Math.random().toString(36).slice(2, 9);
 const newStop = (color = "#8b7cff") => ({ id: uid(), color, opacity: 100, brightness: 100 });
 const solidPaint = (color) => ({ type: "solid", color, opacity: 100, brightness: 100, angle: 0, anim: "none", animSpeed: 3, animReverse: false, stops: [newStop(color)] });
 const gradientPaint = (c1, c2, angle = 0) => ({ type: "gradient", color: c1, opacity: 100, brightness: 100, angle, anim: "none", animSpeed: 3, animReverse: false, stops: [newStop(c1), newStop(c2)] });
-
-const MAX_STOPS = 8;
 const alphaHex = (o) => Math.round((o / 100) * 255).toString(16).padStart(2, "0");
 
-// CSS preview of a gradient paint (CSS angle = svg angle + 90).
+// Generates the CSS preview for the UI gradient bar. 
+// Note: CSS linear-gradient angles are offset by 90 degrees compared to SVG angles, hence the +90 here.
 function cssGradient(paint) {
   const cssAngle = (Number(paint.angle) || 0) + 90;
   const stops = paint.stops
@@ -233,7 +400,7 @@ function cssGradient(paint) {
   return `linear-gradient(${cssAngle}deg, ${stops})`;
 }
 
-// One editable colour: swatch + opacity + brightness (reused for solid & stops).
+// Color stop row for the gradient builder.
 function StopRow({ value, onChange, onRemove, onMoveUp, onMoveDown, disabled, dragging, onDragStart, onDragEnter, onDragEnd }) {
   const patch = (p) => onChange({ ...value, ...p });
   const isReorderable = Boolean(onMoveUp);
@@ -286,7 +453,8 @@ function StopRow({ value, onChange, onRemove, onMoveUp, onMoveDown, disabled, dr
   );
 }
 
-// Full paint editor: solid/gradient switch, stop list, reorder, direction.
+// Master component for managing paints (used for background, borders, text color). 
+// Handles switching between solid/gradients and managing the drag-and-drop stop array.
 function PaintControl({ label, paint, onChange, disabled }) {
   const isGrad = paint.type === "gradient";
   const [dragId, setDragId] = useState(null);
@@ -311,7 +479,6 @@ function PaintControl({ label, paint, onChange, disabled }) {
     setStops(next);
   };
 
-  // Drag-to-reorder: reorder live as the dragged stop passes over others.
   const dragOver = (overId) => {
     if (dragId == null || dragId === overId) return;
     const from = paint.stops.findIndex((s) => s.id === dragId);
@@ -411,16 +578,8 @@ function PaintControl({ label, paint, onChange, disabled }) {
   );
 }
 
-// ============================================================================
-// COLLAPSIBLE SECTION (accordion)
-// ============================================================================
-// Reusable expanding panel. `summary` shows on the right of the header when
-// collapsed (e.g. a live value like "40px · Poppins"). `badge` shows a small
-// pill (e.g. active-effect count). Controlled-open supported via `open`/`onToggle`,
-// otherwise it manages its own state seeded by `defaultOpen`.
-// In-memory store so accordion open/closed state survives tab switches
-// (components unmount when tabs change, but the module does not). Resets on
-// page reload, consistent with the rest of the app's no-persistence rule.
+// Simple in-memory map to persist accordion states as the user switches between tabs.
+// We avoid localStorage here to keep the app strictly stateless on reload.
 const openMemory = new Map();
 function useRememberedOpen(key, defaultOpen) {
   const [open, setOpen] = useState(() => (openMemory.has(key) ? openMemory.get(key) : defaultOpen));
@@ -432,6 +591,7 @@ function useRememberedOpen(key, defaultOpen) {
   return [open, toggle];
 }
 
+// Collapsible accordion section component.
 function Section({ title, icon, summary, badge, defaultOpen = false, open, onToggle, children }) {
   const [localOpen, localToggle] = useRememberedOpen(`sec:${title}`, defaultOpen);
   const isControlled = open !== undefined;
@@ -453,164 +613,10 @@ function Section({ title, icon, summary, badge, defaultOpen = false, open, onTog
 }
 
 // ============================================================================
-// EFFECTS TAB
+// 5. Effects UI
 // ============================================================================
 
-const EFFECT_DEFAULTS = [
-  { id: "lightning",  enabled: false, color: "#a78bfa", opacity: 85, speed: 5,  bolts: 3,   jitter: 8   },
-  { id: "soundwaves", enabled: false, color: "#38bdf8", opacity: 45, speed: 4,  count: 4,   strokeWidth: 1.5 },
-  { id: "particles",  enabled: false, color: "#f472b6", opacity: 70, speed: 3,  count: 15,  size: 3     },
-  { id: "scanlines",  enabled: false, color: "#ffffff", opacity: 18, speed: 3,  lineGap: 4, beamHeight: 36  },
-  { id: "shimmer",    enabled: false, color: "#ffffff", opacity: 55, speed: 3,  beamWidth: 100 },
-  { id: "pulserings", enabled: false, color: "#818cf8", opacity: 60, speed: 3,  count: 3,   strokeWidth: 1.5 },
-  { id: "matrixrain", enabled: false, color: "#4ade80", opacity: 55, speed: 5,  columns: 12, dotSize: 3  },
-  { id: "borderbeam", enabled: false, color: "#38bdf8", opacity: 90, speed: 4,  count: 1,   tailLength: 18, thickness: 3 },
-  { id: "sparkles",   enabled: false, color: "#fde047", opacity: 85, speed: 4,  count: 10,  size: 5 },
-  { id: "confetti",   enabled: false, color: "#f472b6", opacity: 90, speed: 4,  count: 18,  size: 5 },
-  { id: "aurora",     enabled: false, color: "#22d3ee", opacity: 45, speed: 2,  blobs: 3,   size: 60 },
-  { id: "bokeh",      enabled: false, color: "#fbbf24", opacity: 45, speed: 2,  count: 10,  size: 10 },
-  { id: "synthgrid",  enabled: false, color: "#ff2d95", opacity: 55, speed: 4,  columns: 7, rows: 5 },
-  { id: "starfield",  enabled: false, color: "#dbeafe", opacity: 70, speed: 5,  count: 18,  streak: 14 },
-  { id: "vignette",   enabled: false, color: "#000000", opacity: 60, speed: 5,  flicker: 25 },
-];
-
-const EFFECT_META = [
-  {
-    id: "lightning",
-    label: "⚡ Lightning",
-    desc: "Zigzag bolts flicker along the banner edges",
-    controls: [
-      { key: "bolts",  label: "Bolts",  type: "int",   min: 1, max: 6,  step: 1 },
-      { key: "jitter", label: "Jitter", type: "float", min: 2, max: 20, step: 1, fmt: v => `${v}px` },
-    ],
-  },
-  {
-    id: "soundwaves",
-    label: "〜 Sound Waves",
-    desc: "Sine waves ripple horizontally across the banner",
-    controls: [
-      { key: "count",       label: "Waves",     type: "int",   min: 1, max: 8,  step: 1 },
-      { key: "strokeWidth", label: "Thickness", type: "float", min: 0.5, max: 4, step: 0.5, fmt: v => `${v}px` },
-    ],
-  },
-  {
-    id: "particles",
-    label: "✦ Particles",
-    desc: "Glowing sparks drift upward and fade out",
-    controls: [
-      { key: "count", label: "Count", type: "int",   min: 3, max: 40, step: 1 },
-      { key: "size",  label: "Size",  type: "float", min: 1, max: 10, step: 0.5, fmt: v => `${v}px` },
-    ],
-  },
-  {
-    id: "scanlines",
-    label: "📺 Scanlines",
-    desc: "CRT grid with a glowing beam sweeping top to bottom",
-    controls: [
-      { key: "lineGap",    label: "Line gap",    type: "int", min: 2, max: 20, step: 1, fmt: v => `${v}px` },
-      { key: "beamHeight", label: "Beam height", type: "int", min: 8, max: 100, step: 4, fmt: v => `${v}px` },
-    ],
-  },
-  {
-    id: "shimmer",
-    label: "✨ Shimmer",
-    desc: "Diagonal gloss highlight sweeps across the banner",
-    controls: [
-      { key: "beamWidth", label: "Beam width", type: "int", min: 20, max: 300, step: 10, fmt: v => `${v}px` },
-    ],
-  },
-  {
-    id: "pulserings",
-    label: "◎ Pulse Rings",
-    desc: "Rings expand outward from the center and fade",
-    controls: [
-      { key: "count",       label: "Rings",     type: "int",   min: 1, max: 8,  step: 1 },
-      { key: "strokeWidth", label: "Thickness", type: "float", min: 0.5, max: 4, step: 0.5, fmt: v => `${v}px` },
-    ],
-  },
-  {
-    id: "matrixrain",
-    label: "⬇ Matrix Rain",
-    desc: "Columns of glowing dots rain downward",
-    controls: [
-      { key: "columns", label: "Columns",  type: "int",   min: 3, max: 30, step: 1 },
-      { key: "dotSize", label: "Dot size", type: "float", min: 1, max: 8,  step: 0.5, fmt: v => `${v}px` },
-    ],
-  },
-  {
-    id: "borderbeam",
-    label: "◉ Border Beam",
-    desc: "Glowing comets orbit around the banner's border",
-    controls: [
-      { key: "count",      label: "Comets",    type: "int",   min: 1, max: 4,  step: 1 },
-      { key: "tailLength", label: "Tail",      type: "int",   min: 5, max: 40, step: 1, fmt: v => `${v}%` },
-      { key: "thickness",  label: "Thickness", type: "float", min: 1, max: 8,  step: 0.5, fmt: v => `${v}px` },
-    ],
-  },
-  {
-    id: "sparkles",
-    label: "✧ Sparkles",
-    desc: "Four-point stars twinkle in and out across the banner",
-    controls: [
-      { key: "count", label: "Count", type: "int",   min: 3, max: 30, step: 1 },
-      { key: "size",  label: "Size",  type: "float", min: 2, max: 12, step: 0.5, fmt: v => `${v}px` },
-    ],
-  },
-  {
-    id: "confetti",
-    label: "🎊 Confetti",
-    desc: "Colourful pieces tumble down, hues derived from your colour",
-    controls: [
-      { key: "count", label: "Count", type: "int",   min: 5, max: 40, step: 1 },
-      { key: "size",  label: "Size",  type: "float", min: 2, max: 10, step: 0.5, fmt: v => `${v}px` },
-    ],
-  },
-  {
-    id: "aurora",
-    label: "≋ Aurora",
-    desc: "Soft blurred colour blobs drift slowly behind the text",
-    controls: [
-      { key: "blobs", label: "Blobs", type: "int", min: 1, max: 4,   step: 1 },
-      { key: "size",  label: "Size",  type: "int", min: 30, max: 120, step: 5, fmt: v => `${v}%` },
-    ],
-  },
-  {
-    id: "bokeh",
-    label: "○ Bokeh",
-    desc: "Soft out-of-focus orbs drift slowly upward",
-    controls: [
-      { key: "count", label: "Orbs", type: "int", min: 3, max: 25, step: 1 },
-      { key: "size",  label: "Size", type: "int", min: 4, max: 24, step: 1, fmt: v => `${v}px` },
-    ],
-  },
-  {
-    id: "synthgrid",
-    label: "▦ Synthwave Grid",
-    desc: "Retro 3D wireframe floor scrolls toward the viewer",
-    controls: [
-      { key: "columns", label: "Columns", type: "int", min: 3, max: 12, step: 1 },
-      { key: "rows",    label: "Rows",    type: "int", min: 2, max: 8,  step: 1 },
-    ],
-  },
-  {
-    id: "starfield",
-    label: "✵ Starfield",
-    desc: "Hyperspace streaks shoot from the centre outward",
-    controls: [
-      { key: "count",  label: "Streaks", type: "int", min: 6, max: 40, step: 1 },
-      { key: "streak", label: "Length",  type: "int", min: 5, max: 30, step: 1, fmt: v => `${v}%` },
-    ],
-  },
-  {
-    id: "vignette",
-    label: "◐ CRT Vignette",
-    desc: "Edges darken with a subtle CRT flicker — pairs with scanlines",
-    controls: [
-      { key: "flicker", label: "Flicker", type: "int", min: 0, max: 100, step: 5, fmt: v => `${v}%` },
-    ],
-  },
-];
-
+// Renders the individual settings card for a single effect.
 function EffectCard({ meta, eff, onChange }) {
   const [open, toggleOpen] = useRememberedOpen(`eff:${eff.id}`, false);
   const patch = (updates) => onChange({ ...eff, ...updates });
@@ -640,7 +646,6 @@ function EffectCard({ meta, eff, onChange }) {
 
       {open && (
         <div className="eff-controls">
-          {/* Colour */}
           <div className="eff-row">
             <span className="eff-row-label">Colour</span>
             <input
@@ -650,21 +655,18 @@ function EffectCard({ meta, eff, onChange }) {
               onChange={e => patch({ color: e.target.value })}
             />
           </div>
-          {/* Opacity */}
           <div className="eff-row">
             <span className="eff-row-label">Opacity</span>
             <input type="range" min={5} max={100} step={5} value={eff.opacity}
               onChange={e => patch({ opacity: Number(e.target.value) })} />
             <em className="eff-val">{eff.opacity}%</em>
           </div>
-          {/* Speed */}
           <div className="eff-row">
             <span className="eff-row-label">Speed</span>
             <input type="range" min={1} max={10} step={1} value={eff.speed}
               onChange={e => patch({ speed: Number(e.target.value) })} />
             <em className="eff-val">{eff.speed}</em>
           </div>
-          {/* Effect-specific sliders */}
           {meta.controls.map(ctrl => {
             const val = eff[ctrl.key] ?? 0;
             const display = ctrl.fmt ? ctrl.fmt(val) : val;
@@ -686,13 +688,7 @@ function EffectCard({ meta, eff, onChange }) {
   );
 }
 
-// Effects grouped by visual family so the 11 cards aren't one long scroll.
-const EFFECT_GROUPS = [
-  { title: "Ambient",  ids: ["aurora", "bokeh", "shimmer", "scanlines", "vignette", "sparkles"] },
-  { title: "Motion",   ids: ["particles", "confetti", "matrixrain", "soundwaves", "synthgrid", "starfield"] },
-  { title: "Accent",   ids: ["lightning", "pulserings", "borderbeam"] },
-];
-
+// Master tab component grouping all effect cards.
 function EffectsTab({ effects, onChange }) {
   const update = (id, updated) => onChange(
     effects.some(e => e.id === id)
@@ -731,7 +727,7 @@ function EffectsTab({ effects, onChange }) {
 }
 
 // ============================================================================
-// IMPORT / EXPORT (config round-tripping)
+// 6. State management and import logic
 // ============================================================================
 
 const defaultConfig = () => ({
@@ -766,7 +762,8 @@ const defaultConfig = () => ({
   effects: EFFECT_DEFAULTS,
 });
 
-// Unicode-safe base64 (chunked — avoids call-stack limits on long strings).
+// Utility to handle Unicode strings safely when base64 encoding. 
+// Chunking prevents call-stack exceptions when handling particularly long strings.
 const b64encode = (str) => {
   const bytes = new TextEncoder().encode(str);
   let bin = "";
@@ -781,22 +778,19 @@ const b64decode = (b64) => {
 
 const META_RE = /<metadata id="svgcrafter-config">([A-Za-z0-9+/=]+)<\/metadata>/;
 
-// Injects the raw app config into the exported SVG as base64 JSON inside a
-// <metadata> element — standard SVG, ignored by every renderer (incl. GitHub's
-// camo proxy), and makes re-import lossless. embedFont is stripped: it's large
-// (base64 woff2) and the app re-fetches it from `googleFont` on import anyway.
+// We inject the state directly into the SVG as a `<metadata>` tag block. 
+// This allows users to re-upload their SVGs later to edit them seamlessly.
+// We strip out the embedded font binary because it bloats the file unnecessarily; we can easily re-fetch it from the Google Font name upon import.
 function embedConfig(svg, config) {
   const rest = { ...config };
   delete rest.embedFont;
   const meta = `<metadata id="svgcrafter-config">${b64encode(JSON.stringify(rest))}</metadata>`;
-  const at = svg.indexOf(">") + 1; // right after the opening <svg …> tag
+  const at = svg.indexOf(">") + 1; 
   return svg.slice(0, at) + meta + svg.slice(at);
 }
 
-// Merges an imported config over fresh defaults so files exported by older or
-// newer app versions still load: missing keys get defaults, the four parallel
-// sentence arrays are re-synced, sentence ids are regenerated, and the effects
-// list is merged with EFFECT_DEFAULTS by id (old exports gain new effects).
+// Ensures imported config files stay compatible if our default configuration schema updates.
+// Missing properties get backfilled with defaults, and legacy effect objects get merged safely.
 function sanitizeConfig(raw) {
   const base = defaultConfig();
   const cfg = { ...base, ...raw, embedFont: null };
@@ -820,26 +814,20 @@ function sanitizeConfig(raw) {
   return cfg;
 }
 
-// Legacy import: SVG Crafter exports made before config metadata existed.
-// The generator is deterministic, so the config can be reverse-engineered from
-// the markup itself. Recovers: dimensions, sentences, font (size/weight/family,
-// Google Fonts re-fetched by name), text/background/border paints (solid or
-// gradient with stops, angle, and move/rotate animation), border width/radius,
-// glow, transition kind + hold/transition durations, typing mode + cursor,
-// per-sentence motion presets, alignment (nearest-match via re-measured text
-// widths), and which effects were enabled + their colours. Not recoverable:
-// link URL, paint brightness, effect fine-tuning (speeds/counts/sizes) — those
-// fall back to defaults.
+// Fallback legacy parser for SVGs created before we added the <metadata> config embedding.
+// It reverse-engineers the configuration out of the DOM nodes and attributes.
 const LEGACY_EFFECT_MARKERS = {
   ltClip: "lightning", swClip: "soundwaves", ptClip: "particles", scClip: "scanlines",
   shimClip: "shimmer", prClip: "pulserings", mrClip: "matrixrain", bbClip: "borderbeam",
-  spClip: "sparkles", cfClip: "confetti", auClip: "aurora", bkClip: "bokeh",
+  spClip: "sparkles", cfClip: "confetti", auClip: "aurora", bkClip: "blurrylights",
   sgClip: "synthgrid", stClip: "starfield", vgGrad: "vignette",
 };
 
 function parseLegacySvg(root, cssText) {
   const clampN = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
   const texts = [...root.querySelectorAll("text")];
+  
+  // A quick sanity check to confirm this SVG was actually generated by us before we try parsing it.
   const isOurs =
     root.querySelector('[id="textPaint"],[id="bgPaint"],[id="borderPaint"]') ||
     texts.some((t) => (t.getAttribute("class") || "").includes("tt")) ||
@@ -849,18 +837,15 @@ function parseLegacySvg(root, cssText) {
 
   const cfg = defaultConfig();
   const notes = [];
-  // Each stage runs isolated: an unexpected structure (e.g. a file from an
-  // older generator version) degrades that one field to defaults instead of
-  // aborting the whole legacy parse and losing everything.
+  
+  // We run each parsing stage in isolation so one failure doesn't ruin the entire recovery process.
   const stage = (name, fn) => { try { fn(); } catch { notes.push(name); } };
 
-  // ---- dimensions -----------------------------------------------------------
   const W = Number(root.getAttribute("width"));
   const H = Number(root.getAttribute("height"));
   if (W > 0) { cfg.autoWidth = false; cfg.bannerWidth = Math.round(W); }
   if (H > 0) { cfg.autoHeight = false; cfg.bannerHeight = Math.round(H); }
 
-  // ---- paint recovery (solid hex or gradient def) ---------------------------
   const parsePaint = (val, opacityAttr) => {
     if (!val || val === "none") return null;
     const ref = val.match(/url\(#(.+?)\)/);
@@ -899,7 +884,6 @@ function parseLegacySvg(root, cssText) {
       brightness: 100, angle, anim, animSpeed, animReverse, stops };
   };
 
-  // ---- background / border (the main rect) ----------------------------------
   stage("background", () => {
     const mainRect =
       [...root.children].find((el) =>
@@ -917,10 +901,10 @@ function parseLegacySvg(root, cssText) {
     }
   });
 
-  // ---- text: sentences, font, paint, glow ------------------------------------
   cfg.sentences = texts.map((t) => t.textContent).slice(0, 6);
   const t0 = texts[0];
   let familyStr = FONTS[0].stack;
+  
   stage("text style", () => {
     cfg.fontSize = Number(t0.getAttribute("font-size")) || cfg.fontSize;
     cfg.fontWeight = Number(t0.getAttribute("font-weight")) || cfg.fontWeight;
@@ -935,13 +919,12 @@ function parseLegacySvg(root, cssText) {
     } else {
       const fam = famAttr.match(/^'([^']+)'/);
       if (fam && !FONTS.some((f) => f.stack.includes(fam[1]))) {
-        cfg.googleFont = fam[1];   // triggers the existing auto-refetch effect
+        cfg.googleFont = fam[1];   
         cfg.fontId = "custom";
       }
     }
   });
 
-  // ---- transition ------------------------------------------------------------
   stage("transition", () => {
   const typingClip = root.querySelector('clipPath[id^="clip"] rect > animate[attributeName="width"]');
   if (typingClip) {
@@ -973,7 +956,6 @@ function parseLegacySvg(root, cssText) {
   }
   });
 
-  // ---- per-sentence motion + alignment ---------------------------------------
   stage("text motion", () => {
   cfg.sentenceMotions = texts.map((t) => {
     const wrap = t.closest("g[class^=mv]");
@@ -1001,11 +983,9 @@ function parseLegacySvg(root, cssText) {
   });
   cfg.sentenceIds = cfg.sentences.map(() => uid());
 
-  // ---- effects: detect by marker id, recover colour + parameters --------------
   cfg.effects = EFFECT_DEFAULTS.map((d) => {
     const marker = Object.keys(LEGACY_EFFECT_MARKERS).find((k) => LEGACY_EFFECT_MARKERS[k] === d.id);
     let node = marker && root.querySelector(`[id="${marker}"]`);
-    // Pre-session exports had no bbClip — detect old borderbeam structurally.
     if (!node && d.id === "borderbeam") node = root.querySelector("rect[pathLength]");
     if (!node) return d;
     const eff = { ...d, enabled: true };
@@ -1025,11 +1005,6 @@ function parseLegacySvg(root, cssText) {
       const num = (v) => Number(v) || 0;
       switch (d.id) {
         case "borderbeam": {
-          // Layers are rects with pathLength — works for both the old 3-layer
-          // and new 5-layer formats. Comet count from the dash period, tail
-          // from the longest dash, thickness from the narrowest stroke (the
-          // glow underlay is thick × 2.4–2.6), colour from a non-brightened
-          // layer, speed from the shared duration (dur = 24 / speed).
           const layers = [...(grp || root).querySelectorAll("rect[pathLength]")]
             .map((r) => {
               const [on, gap] = (r.getAttribute("stroke-dasharray") || "0 0").split(/\s+/).map(Number);
@@ -1042,7 +1017,7 @@ function parseLegacySvg(root, cssText) {
             eff.count = Math.max(1, Math.min(4, Math.round(100 / (layers[0].on + layers[0].gap))));
             eff.tailLength = Math.round(Math.max(...layers.map((l) => l.on)));
             eff.thickness = Math.min(...layers.map((l) => l.w));
-            eff.color = layers[0].stroke || eff.color;   // widest/glow layer = base colour
+            eff.color = layers[0].stroke || eff.color;   
             eff.speed = Math.max(1, Math.min(10, Math.round(24 / layers[0].dur)));
           }
           break;
@@ -1059,7 +1034,7 @@ function parseLegacySvg(root, cssText) {
           eff.strokeWidth = num(rings[0]?.getAttribute("stroke-width")) || eff.strokeWidth;
           break;
         }
-        case "particles": case "bokeh":
+        case "particles": case "blurrylights":
           eff.count = grp.querySelectorAll("circle").length || eff.count; break;
         case "sparkles":
           eff.count = grp.querySelectorAll("path").length || eff.count; break;
@@ -1073,7 +1048,7 @@ function parseLegacySvg(root, cssText) {
           const lines = [...grp.querySelectorAll("line")];
           const scrolling = lines.filter((l) => l.querySelector("animate")).length;
           if (scrolling) eff.rows = scrolling;
-          const statics = lines.length - scrolling - 1;   // minus horizon line
+          const statics = lines.length - scrolling - 1;   
           if (statics > 0) eff.columns = Math.round(statics / 2);
           break;
         }
@@ -1085,15 +1060,18 @@ function parseLegacySvg(root, cssText) {
   return cfg;
 }
 
-// Import path, in order of fidelity: (1) metadata block → lossless, (2) legacy
-// SVG Crafter export → reverse-engineered from markup, (3) anything else →
-// best-effort text + dimensions so foreign SVGs still open.
+// Master import flow: 
+// 1. Try metadata parse (lossless)
+// 2. Fall back to DOM scraping (lossy for legacy exports)
+// 3. Fall back to raw bounds and text extraction (so foreign SVGs don't crash the app)
 function parseImportedSvg(text) {
   const m = text.match(META_RE);
   if (m) {
     try {
       return { config: sanitizeConfig(JSON.parse(b64decode(m[1]))), foreign: false };
-    } catch { /* corrupted metadata → fall through */ }
+    } catch { 
+      // If metadata is corrupted, continue down the chain to try the legacy parser.
+    }
   }
 
   const doc = new DOMParser().parseFromString(text, "image/svg+xml");
@@ -1104,7 +1082,9 @@ function parseImportedSvg(text) {
     const cssText = [...root.querySelectorAll("style")].map((st) => st.textContent).join("\n");
     const legacy = parseLegacySvg(root, cssText);
     if (legacy) return { config: sanitizeConfig(legacy), foreign: false, legacy: true };
-  } catch { /* malformed legacy file → fall through to foreign parse */ }
+  } catch { 
+    // Handled below if it fails.
+  }
 
   const cfg = defaultConfig();
   const texts = [...root.querySelectorAll("text")]
@@ -1122,6 +1102,10 @@ function parseImportedSvg(text) {
   if (h > 0) { cfg.autoHeight = false; cfg.bannerHeight = Math.round(h); }
   return { config: cfg, foreign: true };
 }
+
+// ============================================================================
+// 7. Main app
+// ============================================================================
 
 export default function App() {
   const [tab, setTab] = useState("text");
@@ -1142,7 +1126,6 @@ export default function App() {
   };
   const setPaint = (key) => (p) => setConfig((c) => ({ ...c, [key]: p }));
 
-  // sentence list helpers
   const setSentence = (i, text) =>
     setConfig((c) => ({ ...c, sentences: c.sentences.map((s, idx) => (idx === i ? text : s)) }));
   const setSentenceAlign = (i, align) =>
@@ -1167,7 +1150,7 @@ export default function App() {
           }
         : c
     );
-  // Reorder all parallel sentence arrays together (text, align, motion, id).
+    
   const moveSentence = (from, to) =>
     setConfig((c) => {
       const n = c.sentences.length;
@@ -1188,7 +1171,6 @@ export default function App() {
       };
     });
 
-  // Active font family, measured sentences, and the resulting SVG.
   const fontFamily = useMemo(() => familyFor(config.fontId, config.embedFont), [config.fontId, config.embedFont]);
   const measured = useMemo(
     () =>
@@ -1202,11 +1184,9 @@ export default function App() {
   const auto = useMemo(() => autoSize(measured, config.fontSize), [measured, config.fontSize]);
   const svg = useMemo(() => generateSvg({ ...config, sentences: measured, fontFamily }), [config, measured, fontFamily]);
 
-  // Fetch + embed a Google font whenever the chosen family changes. Status is
-  // set in the handler (loading) and in the async then/catch (ready/error) — no
-  // synchronous setState inside the effect body.
   const [fontStatus, setFontStatus] = useState({ state: "idle", msg: "" });
   const [fontQuery, setFontQuery] = useState("");
+  
   useEffect(() => {
     const fam = config.googleFont;
     if (!fam) return;
@@ -1240,7 +1220,6 @@ export default function App() {
     setConfig((c) => ({ ...c, fontId: "sans", googleFont: "", embedFont: null }));
   };
 
-  // Font search autocomplete (case-insensitive; prefix matches first).
   const [showSuggest, setShowSuggest] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
   const suggestions = useMemo(() => {
@@ -1255,12 +1234,14 @@ export default function App() {
     }
     return [...starts, ...contains].slice(0, 8);
   }, [fontQuery]);
+  
   const chooseFont = (name) => {
     setFontQuery(name);
     setShowSuggest(false);
     setActiveIdx(-1);
     selectGoogleFont(name);
   };
+  
   const onFontKeyDown = (e) => {
     if (showSuggest && suggestions.length) {
       if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx((i) => (i + 1) % suggestions.length); return; }
@@ -1273,7 +1254,6 @@ export default function App() {
     }
   };
 
-  // Width/height: seed the slider with the live auto value when going custom.
   const setWidthAuto = (isAuto) =>
     setConfig((c) => ({ ...c, autoWidth: isAuto, bannerWidth: isAuto ? c.bannerWidth : auto.width }));
   const setHeightAuto = (isAuto) =>
