@@ -42,9 +42,9 @@ This is set up to deploy to GitHub Pages automatically via Actions. Pushing to `
 1. Use the [Live App](https://mohabhindawy.github.io/SVG-Crafter/) to design your banner.
 2. Click **Download .svg** (or copy the raw SVG code).
 3. Save the file in your repo (e.g., `assets/banner.svg`).
-4. Add README snippet you copied:
+4. Add the README snippet you copied:
    ```markdown
-   ![Banner Name](./assets/banner.svg) # example
+   ![Banner Name](./assets/banner.svg)
    ```
 
 ## Known Limitations
