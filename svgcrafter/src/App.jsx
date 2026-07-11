@@ -418,11 +418,25 @@ function PaintControl({ label, paint, onChange, disabled }) {
 // collapsed (e.g. a live value like "40px · Poppins"). `badge` shows a small
 // pill (e.g. active-effect count). Controlled-open supported via `open`/`onToggle`,
 // otherwise it manages its own state seeded by `defaultOpen`.
+// In-memory store so accordion open/closed state survives tab switches
+// (components unmount when tabs change, but the module does not). Resets on
+// page reload, consistent with the rest of the app's no-persistence rule.
+const openMemory = new Map();
+function useRememberedOpen(key, defaultOpen) {
+  const [open, setOpen] = useState(() => (openMemory.has(key) ? openMemory.get(key) : defaultOpen));
+  const toggle = () => setOpen((o) => {
+    const next = !o;
+    openMemory.set(key, next);
+    return next;
+  });
+  return [open, toggle];
+}
+
 function Section({ title, icon, summary, badge, defaultOpen = false, open, onToggle, children }) {
-  const [localOpen, setLocalOpen] = useState(defaultOpen);
+  const [localOpen, localToggle] = useRememberedOpen(`sec:${title}`, defaultOpen);
   const isControlled = open !== undefined;
   const expanded = isControlled ? open : localOpen;
-  const toggle = () => (isControlled ? onToggle && onToggle(!expanded) : setLocalOpen((o) => !o));
+  const toggle = () => (isControlled ? onToggle && onToggle(!expanded) : localToggle());
 
   return (
     <div className={"section" + (expanded ? " section-open" : "")}>
@@ -454,10 +468,10 @@ const EFFECT_DEFAULTS = [
   { id: "sparkles",   enabled: false, color: "#fde047", opacity: 85, speed: 4,  count: 10,  size: 5 },
   { id: "confetti",   enabled: false, color: "#f472b6", opacity: 90, speed: 4,  count: 18,  size: 5 },
   { id: "aurora",     enabled: false, color: "#22d3ee", opacity: 45, speed: 2,  blobs: 3,   size: 60 },
-  { id: "blurlight",      enabled: false, color: "#fbbf24", opacity: 45, speed: 2,  count: 10,  size: 10 },
+  { id: "blurrylights",      enabled: false, color: "#fbbf24", opacity: 45, speed: 2,  count: 10,  size: 10 },
   { id: "synthgrid",  enabled: false, color: "#ff2d95", opacity: 55, speed: 4,  columns: 7, rows: 5 },
   { id: "starfield",  enabled: false, color: "#dbeafe", opacity: 70, speed: 5,  count: 18,  streak: 14 },
-  { id: "vignette",   enabled: false, color: "#ce3d31", opacity: 60, speed: 5,  flicker: 25 },
+  { id: "vignette",   enabled: false, color: "#000000", opacity: 60, speed: 5,  flicker: 25 },
 ];
 
 const EFFECT_META = [
@@ -561,7 +575,7 @@ const EFFECT_META = [
     ],
   },
   {
-    id: "blurlight",
+    id: "blurrylights",
     label: "Blurry Lights",
     desc: "Soft out-of-focus orbs drift slowly upward",
     controls: [
@@ -598,7 +612,7 @@ const EFFECT_META = [
 ];
 
 function EffectCard({ meta, eff, onChange }) {
-  const [open, setOpen] = useState(false);
+  const [open, toggleOpen] = useRememberedOpen(`eff:${eff.id}`, false);
   const patch = (updates) => onChange({ ...eff, ...updates });
 
   return (
@@ -615,7 +629,7 @@ function EffectCard({ meta, eff, onChange }) {
         <button
           type="button"
           className={"eff-chevron" + (open ? " open" : "")}
-          onClick={() => setOpen(o => !o)}
+          onClick={toggleOpen}
           aria-label={open ? "Collapse" : "Expand"}
         >
           ›
@@ -674,7 +688,7 @@ function EffectCard({ meta, eff, onChange }) {
 
 // Effects grouped by visual family so the 11 cards aren't one long scroll.
 const EFFECT_GROUPS = [
-  { title: "Ambient",  ids: ["aurora", "blurlight", "shimmer", "scanlines", "vignette", "sparkles"] },
+  { title: "Ambient",  ids: ["aurora", "blurrylights", "shimmer", "scanlines", "vignette", "sparkles"] },
   { title: "Motion",   ids: ["particles", "confetti", "matrixrain", "soundwaves", "synthgrid", "starfield"] },
   { title: "Accent",   ids: ["lightning", "pulserings", "borderbeam"] },
 ];
