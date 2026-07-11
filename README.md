@@ -29,7 +29,7 @@ Here are a few designs you can easily replicate!
 Clone the repo and run it locally:
 
 ```bash
-git clone [https://github.com/MohabHindawy/SVG-Crafter.git](https://github.com/MohabHindawy/SVG-Crafter.git)
+git clone https://github.com/MohabHindawy/SVG-Crafter.git
 cd svgcrafter
 npm install
 npm run dev
