@@ -815,7 +815,7 @@ function buildAurora(cfg, W, H, br) {
 }
 
 // Uses stacking blurs at different rates to create a simulated depth-of-field effect.
-function buildBlurlight(cfg, W, H, br) {
+function buildBlurrylights(cfg, W, H, br) {
   const color = cfg.color || "#fbbf24";
   const o     = op(cfg.opacity ?? 45);
   const speed = clamp(Number(cfg.speed) || 2, 1, 10);
@@ -991,21 +991,21 @@ function buildEffects(effects, W, H, br) {
   for (const eff of effects) {
     if (!eff || !eff.enabled) continue;
     let r = null;
-    if (eff.id === "lightning")  r = buildLightning(eff,  W, H, br);
-    if (eff.id === "soundwaves") r = buildSoundWaves(eff, W, H, br);
-    if (eff.id === "particles")  r = buildParticles(eff,  W, H, br);
-    if (eff.id === "scanlines")  r = buildScanlines(eff,  W, H, br);
-    if (eff.id === "shimmer")    r = buildShimmer(eff,    W, H, br);
-    if (eff.id === "pulserings") r = buildPulseRings(eff, W, H, br);
-    if (eff.id === "matrixrain") r = buildMatrixRain(eff, W, H, br);
-    if (eff.id === "borderbeam") r = buildBorderBeam(eff, W, H, br);
-    if (eff.id === "sparkles")   r = buildSparkles(eff,   W, H, br);
-    if (eff.id === "confetti")   r = buildConfetti(eff,   W, H, br);
-    if (eff.id === "aurora")     r = buildAurora(eff,     W, H, br);
-    if (eff.id === "blurlight")  r = buildBlurlight(eff,  W, H, br);
-    if (eff.id === "synthgrid")  r = buildSynthGrid(eff,  W, H, br);
-    if (eff.id === "starfield")  r = buildStarfield(eff,  W, H, br);
-    if (eff.id === "vignette")   r = buildVignette(eff,   W, H, br);
+    if (eff.id === "lightning")     r = buildLightning(eff,     W, H, br);
+    if (eff.id === "soundwaves")    r = buildSoundWaves(eff,    W, H, br);
+    if (eff.id === "particles")     r = buildParticles(eff,     W, H, br);
+    if (eff.id === "scanlines")     r = buildScanlines(eff,     W, H, br);
+    if (eff.id === "shimmer")       r = buildShimmer(eff,       W, H, br);
+    if (eff.id === "pulserings")    r = buildPulseRings(eff,    W, H, br);
+    if (eff.id === "matrixrain")    r = buildMatrixRain(eff,    W, H, br);
+    if (eff.id === "borderbeam")    r = buildBorderBeam(eff,    W, H, br);
+    if (eff.id === "sparkles")      r = buildSparkles(eff,      W, H, br);
+    if (eff.id === "confetti")      r = buildConfetti(eff,      W, H, br);
+    if (eff.id === "aurora")        r = buildAurora(eff,        W, H, br);
+    if (eff.id === "blurrylights")  r = buildBlurrylights(eff,  W, H, br);
+    if (eff.id === "synthgrid")     r = buildSynthGrid(eff,     W, H, br);
+    if (eff.id === "starfield")     r = buildStarfield(eff,     W, H, br);
+    if (eff.id === "vignette")      r = buildVignette(eff,      W, H, br);
     if (!r) continue;
     allDefs.push(...r.defs);
     allEls.push(...r.els);
@@ -1107,7 +1107,7 @@ export function generateSvg(config) {
     `/>`;
 
   const textAttrs =
-    `fill="${txt.fill}" fill-opacity="${txt.opacity}" ` +
+    `xml:space="preserve" fill="${txt.fill}" fill-opacity="${txt.opacity}" ` +
     `font-family="${fontFamily}" font-size="${fontSize}" font-weight="${fontWeight}"` +
     (glow ? ` filter="url(#glow)"` : "");
 
