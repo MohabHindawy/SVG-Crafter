@@ -7,12 +7,11 @@
   --border: #30363d;
   --text: #c9d1d9;
   --muted: #8b949e;
-  --accent: #2f81f7;
-  --accent-2: #58a6ff;
+  --accent: #3fb950;
+  --accent-2: #56d364;
   --on-accent: #ffffff;
   --check: rgba(139, 148, 158, 0.1);
-  --glow: rgba(47, 129, 247, 0.4);
-  --success: #238636;
+  --glow: rgba(63, 185, 80, 0.4);
   --tab-active: #f78166;
 }
 
@@ -133,7 +132,7 @@ input[type="text"] {
   border-radius: 6px; color: var(--text); font-family: var(--font-body);
   font-size: 14px; padding: 5px 12px; outline: none; transition: border-color 0.15s, box-shadow 0.15s;
 }
-input[type="text"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47, 129, 247, 0.4); }
+input[type="text"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(63, 185, 80, 0.4); }
 
 input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; }
 input:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -189,7 +188,7 @@ input:disabled { opacity: 0.45; cursor: not-allowed; }
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 .font-chip:hover:not(.on) { border-color: var(--accent); }
-.font-chip.on { border-color: var(--success); color: var(--success); box-shadow: inset 0 0 0 1px var(--success); }
+.font-chip.on { border-color: var(--accent); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 
 .font-load { display: flex; gap: 8px; margin-top: 10px; }
 .font-load input[type="text"] { flex: 1; }
@@ -251,7 +250,7 @@ input:disabled { opacity: 0.45; cursor: not-allowed; }
   font-family: var(--font-body); font-size: 12px; font-weight: 600;
   padding: 6px 12px; border-radius: 4px; cursor: pointer; transition: color 0.15s, background 0.15s;
 }
-.seg button.on { background: var(--success); color: var(--on-accent); }
+.seg button.on { background: var(--accent); color: var(--on-accent); }
 
 .gradbar { height: 16px; border-radius: 4px; border: 1px solid var(--border); margin-bottom: 14px; }
 .dir { margin-bottom: 14px; }
@@ -312,12 +311,12 @@ input:disabled { opacity: 0.45; cursor: not-allowed; }
 .remove:hover:not(:disabled) { color: #ff5b6e; border-color: #ff5b6e; }
 
 .add {
-  margin-top: 12px; width: 100%; background: transparent; color: var(--success);
+  margin-top: 12px; width: 100%; background: transparent; color: var(--text);
   border: 1px dashed var(--border); border-radius: 6px;
   font-family: var(--font-body); font-size: 13px; font-weight: 600;
-  padding: 10px; cursor: pointer; transition: border-color 0.15s;
+  padding: 10px; cursor: pointer; transition: border-color 0.15s, color 0.15s;
 }
-.add:hover:not(:disabled) { border-color: var(--success); }
+.add:hover:not(:disabled) { border-color: #ffffff; color: #ffffff; }
 .add:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ---- preview stage (checkerboard reveals transparency) ---- */
@@ -335,11 +334,11 @@ input:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .actions { display: flex; gap: 12px; margin-bottom: 22px; }
 .actions button {
-  flex: 1; background: var(--success); color: #ffffff; border: 1px solid rgba(240, 246, 252, 0.1);
+  flex: 1; background: var(--accent); color: #ffffff; border: 1px solid rgba(240, 246, 252, 0.1);
   border-radius: 6px; font-family: var(--font-body); font-weight: 600; font-size: 14px;
   padding: 5px 16px; min-height: 32px; cursor: pointer; transition: background 0.15s, border-color 0.15s;
 }
-.actions button:hover { background: #2ea043; }
+.actions button:hover { background: var(--accent-2); }
 .actions button:active { transform: scale(0.98); }
 .import-btn {
   flex: 1; display: flex; align-items: center; justify-content: center;
@@ -351,7 +350,7 @@ input:disabled { opacity: 0.45; cursor: not-allowed; }
 .import-btn:active { transform: scale(0.98); }
 
 .import-note { margin: -12px 0 18px; font-size: 12px; font-weight: 600; }
-.import-note.ok { color: var(--success); }
+.import-note.ok { color: var(--accent); }
 .import-note.warn { color: #fbbf24; }
 .import-note.error { color: #ff6b7d; }
 
@@ -360,7 +359,7 @@ input:disabled { opacity: 0.45; cursor: not-allowed; }
   background: var(--panel-2); border: 1px solid var(--border);
   border-radius: 6px; padding: 11px 14px;
 }
-.snippet code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; font-size: 13px; font-weight: 600; color: var(--success); overflow-x: auto; white-space: nowrap; }
+.snippet code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; font-size: 13px; font-weight: 600; color: var(--text); overflow-x: auto; white-space: nowrap; }
 .ghost {
   background: transparent; border: 1px solid var(--border); color: var(--muted);
   border-radius: 6px; padding: 6px 12px; font-family: var(--font-body); font-size: 12px; font-weight: 600; cursor: pointer;
@@ -393,8 +392,8 @@ input:disabled { opacity: 0.45; cursor: not-allowed; }
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .eff-card.eff-on {
-  border-color: var(--success);
-  box-shadow: 0 0 0 1px var(--success), 0 2px 16px rgba(46,160,67,0.15);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 2px 16px rgba(63, 185, 80, 0.15);
 }
 
 /* Header row: checkbox + label + chevron */
@@ -408,14 +407,14 @@ input:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 .eff-toggle-row input[type="checkbox"] {
   width: 15px; height: 15px; flex: none;
-  accent-color: var(--success); cursor: pointer;
+  accent-color: var(--accent); cursor: pointer;
 }
 .eff-label {
   font-size: 13px; font-weight: 700; color: var(--text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   transition: color 0.15s;
 }
-.eff-on .eff-label { color: var(--success); }
+.eff-on .eff-label { color: var(--accent); }
 
 /* Expand/collapse chevron */
 .eff-chevron {
@@ -500,7 +499,7 @@ input[type="color"].eff-swatch {
 .section-badge {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
-  background: var(--success); color: #ffffff;
+  background: var(--accent); color: #ffffff;
   font-size: 10px; font-weight: 800; line-height: 1; flex: none;
 }
 .section-chevron {
@@ -526,7 +525,7 @@ input[type="color"].eff-swatch {
 .tab-badge {
   display: inline-flex; align-items: center; justify-content: center;
   width: 15px; height: 15px; border-radius: 50%; margin-left: 5px;
-  background: var(--success); color: #ffffff;
+  background: var(--accent); color: #ffffff;
   font-size: 9px; font-weight: 800; vertical-align: middle;
   line-height: 1;
 }
