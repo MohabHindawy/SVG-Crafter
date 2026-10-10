@@ -1307,13 +1307,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="topbar">
-        <div className="brand">
-          <span className="dot" />
-          <span className="wordmark">SVG <span className="accent">Crafter</span></span>
-          <span className="tagline">GitHub profile banner generator</span>
-        </div>
-      </header>
+
 
       <div className="workspace">
         <aside className="sidebar">
