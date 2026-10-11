@@ -2,12 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { generateSvg, adjustBrightness, autoSize, normalizeUrl } from "./generateSvg";
 import "./App.css";
 
-// ============================================================================
-// 1. Utilities
-// ============================================================================
-
-// We need the DOM to measure text accurately, so this stays out of the SVG generation logic.
-// Heads up: The font family here must perfectly match what the SVG renders, otherwise the typewriter reveal animation will drift off sync.
+// Font styles must match SVG text attributes so canvas measurement aligns with SVG typewriter clip paths.
 function measureTextWidth(text, fontSize, fontWeight, fontFamily) {
   const canvas =
     measureTextWidth._c || (measureTextWidth._c = document.createElement("canvas"));
@@ -16,8 +11,6 @@ function measureTextWidth(text, fontSize, fontWeight, fontFamily) {
   return Math.ceil(ctx.measureText(text || " ").width);
 }
 
-// Calculates the width of the text as each character is added. 
-// This is critical for the "letter by letter" typing mode to ensure the clip-path reveals land exactly on character boundaries.
 function measureSentence(text, fontSize, fontWeight, fontFamily) {
   const prefixes = [0];
   for (let k = 1; k <= text.length; k++) prefixes.push(measureTextWidth(text.slice(0, k), fontSize, fontWeight, fontFamily));
@@ -32,7 +25,6 @@ function bufferToBase64(buf) {
   return btoa(bin);
 }
 
-// Parses the Google Fonts CSS2 response to extract the basic-latin woff2 file URL.
 function pickLatinFace(css) {
   const re = /\/\*\s*([\w-]+)\s*\*\/\s*@font-face\s*{([^}]*)}/g;
   const found = [];
@@ -44,10 +36,8 @@ function pickLatinFace(css) {
     found.push({
       label: m[1],
       url,
-      // eslint-disable-next-line no-sparse-arrays
-      weight: (body.match(/font-weight:\s*([^;]+);/) || [, "400"])[1].trim(),
-      // eslint-disable-next-line no-sparse-arrays
-      style: (body.match(/font-style:\s*([^;]+);/) || [, "normal"])[1].trim(),
+      weight: (body.match(/font-weight:\s*([^;]+);/)?.[1] || "400").trim(),
+      style: (body.match(/font-style:\s*([^;]+);/)?.[1] || "normal").trim(),
     });
   }
   if (found.length) return found.find((f) => f.label === "latin") || found[0];
@@ -55,8 +45,7 @@ function pickLatinFace(css) {
   return url ? { url, weight: "400", style: "normal" } : null;
 }
 
-// Handles fetching a Google font, embedding it as a base64 string, and loading it into the DOM so we can measure it accurately.
-// It returns a ready-to-inline CSS string so the final SVG stays entirely self-contained.
+// Embeds WOFF2 data URI directly so the exported SVG remains standalone without network dependencies.
 async function loadGoogleFont(family) {
   const res = await fetch(`https://fonts.googleapis.com/css2?family=${encodeURIComponent(family)}&display=swap`);
   if (!res.ok) throw new Error(`Couldn't find "${family}" on Google Fonts.`);
@@ -76,7 +65,6 @@ async function loadGoogleFont(family) {
   return { family, css };
 }
 
-// Bolds the matched query within the autocomplete dropdown, similar to how word processors do it.
 function highlightMatch(name, query) {
   const q = query.trim();
   if (!q) return name;
@@ -91,14 +79,8 @@ function highlightMatch(name, query) {
   );
 }
 
-// Resolves the active CSS font-family string. 
-// If it's a fetched Google font, it gets rendered under its real family name with a fallback to the default system stack.
 const familyFor = (fontId, embedFont) =>
   embedFont ? `'${embedFont.family}', ${FONTS[0].stack}` : (FONTS.find((f) => f.id === fontId) || FONTS[0]).stack;
-
-// ============================================================================
-// 2. Constants
-// ============================================================================
 
 const TABS = [
   { id: "text", label: "Text" },
@@ -110,7 +92,7 @@ const TABS = [
 const MAX_SENTENCES = 6;
 const MAX_STOPS = 8;
 
-// We use system fonts by default. They don't require external fetching, which is ideal since GitHub's image proxy often blocks external web fonts from loading.
+// System font fallbacks ensure rendering when GitHub image proxies block external network fonts.
 const FONTS = [
   { id: "sans", label: "Sans", stack: "system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" },
   { id: "serif", label: "Serif", stack: "Georgia, 'Times New Roman', Times, serif" },
@@ -119,14 +101,11 @@ const FONTS = [
   { id: "condensed", label: "Condensed", stack: "'Arial Narrow', 'Helvetica Neue', Arial, sans-serif" },
 ];
 
-// Quick-pick chips for popular Google Fonts to save users time.
 const GOOGLE_FONTS = [
   "Inter", "Poppins", "Montserrat", "Roboto Slab", "Playfair Display",
   "Lobster", "Pacifico", "Bebas Neue", "Caveat", "Fira Code",
 ];
 
-// A larger catalogue used purely for the autocomplete suggestions as the user types. 
-// Note: Users can still load fonts not on this list if they type the exact name.
 const FONT_LIBRARY = [
   "Abril Fatface", "Albert Sans", "Alegreya", "Alegreya Sans", "Amatic SC", "Anton",
   "Archivo", "Archivo Black", "Arvo", "Assistant", "Audiowide", "Baloo 2", "Barlow",
@@ -179,14 +158,10 @@ const MOTIONS = [
   { id: "orbit",  label: "Orbit (circle)" },
 ];
 
-// ============================================================================
-// 3. Defaults and metadata
-// ============================================================================
-
 const EFFECT_DEFAULTS = [
   { id: "lightning",    enabled: false, color: "#a78bfa", opacity: 85, speed: 5,  bolts: 3,   jitter: 8   },
   { id: "soundwaves",   enabled: false, color: "#38bdf8", opacity: 45, speed: 4,  count: 4,   strokeWidth: 1.5 },
-  { id: "particles",    enabled: false, color: "#f472b  6", opacity: 70, speed: 3,  count: 15,  size: 3     },
+  { id: "particles",    enabled: false, color: "#f472b6", opacity: 70, speed: 3,  count: 15,  size: 3     },
   { id: "scanlines",    enabled: false, color: "#ffffff", opacity: 20, speed: 3,  lineGap: 4, beamHeight: 36  },
   { id: "shimmer",      enabled: true,  color: "#f68bfe", opacity: 25, speed: 3,  beamWidth: 100 }, 
   { id: "pulserings",   enabled: false, color: "#818cf8", opacity: 60, speed: 3,  count: 3,   strokeWidth: 1.5 },
@@ -380,15 +355,13 @@ function MotionIcon({ type }) {
   }
 }
 
-// Helpers for initializing and managing our color objects (paints).
 const uid = () => Math.random().toString(36).slice(2, 9);
 const newStop = (color = "#8b7cff") => ({ id: uid(), color, opacity: 100, brightness: 100 });
 const solidPaint = (color) => ({ type: "solid", color, opacity: 100, brightness: 100, angle: 0, anim: "none", animSpeed: 3, animReverse: false, stops: [newStop(color)] });
 const gradientPaint = (c1, c2, angle = 0) => ({ type: "gradient", color: c1, opacity: 100, brightness: 100, angle, anim: "none", animSpeed: 3, animReverse: false, stops: [newStop(c1), newStop(c2)] });
 const alphaHex = (o) => Math.round((o / 100) * 255).toString(16).padStart(2, "0");
 
-// Generates the CSS preview for the UI gradient bar. 
-// Note: CSS linear-gradient angles are offset by 90 degrees compared to SVG angles, hence the +90 here.
+// CSS linear-gradient angles are offset by 90deg relative to SVG coordinate angles.
 function cssGradient(paint) {
   const cssAngle = (Number(paint.angle) || 0) + 90;
   const stops = paint.stops
@@ -400,7 +373,6 @@ function cssGradient(paint) {
   return `linear-gradient(${cssAngle}deg, ${stops})`;
 }
 
-// Color stop row for the gradient builder.
 function StopRow({ value, onChange, onRemove, onMoveUp, onMoveDown, disabled, dragging, onDragStart, onDragEnter, onDragEnd }) {
   const patch = (p) => onChange({ ...value, ...p });
   const isReorderable = Boolean(onMoveUp);
@@ -420,7 +392,7 @@ function StopRow({ value, onChange, onRemove, onMoveUp, onMoveDown, disabled, dr
             onDragStart={(e) => {
               e.dataTransfer.effectAllowed = "move";
               e.dataTransfer.setData("text/plain", "");
-              onDragStart && onDragStart();
+              onDragStart?.();
             }}
             role="button"
             aria-label="Drag to reorder"
@@ -453,8 +425,6 @@ function StopRow({ value, onChange, onRemove, onMoveUp, onMoveDown, disabled, dr
   );
 }
 
-// Master component for managing paints (used for background, borders, text color). 
-// Handles switching between solid/gradients and managing the drag-and-drop stop array.
 function PaintControl({ label, paint, onChange, disabled }) {
   const isGrad = paint.type === "gradient";
   const [dragId, setDragId] = useState(null);
@@ -578,8 +548,7 @@ function PaintControl({ label, paint, onChange, disabled }) {
   );
 }
 
-// Simple in-memory map to persist accordion states as the user switches between tabs.
-// We avoid localStorage here to keep the app strictly stateless on reload.
+// In-memory map persists accordion states across tab switches without persisting to storage.
 const openMemory = new Map();
 function useRememberedOpen(key, defaultOpen) {
   const [open, setOpen] = useState(() => (openMemory.has(key) ? openMemory.get(key) : defaultOpen));
@@ -591,12 +560,11 @@ function useRememberedOpen(key, defaultOpen) {
   return [open, toggle];
 }
 
-// Collapsible accordion section component.
 function Section({ title, icon, summary, badge, defaultOpen = false, open, onToggle, children }) {
   const [localOpen, localToggle] = useRememberedOpen(`sec:${title}`, defaultOpen);
   const isControlled = open !== undefined;
   const expanded = isControlled ? open : localOpen;
-  const toggle = () => (isControlled ? onToggle && onToggle(!expanded) : localToggle());
+  const toggle = () => (isControlled ? onToggle?.(!expanded) : localToggle());
 
   return (
     <div className={"section" + (expanded ? " section-open" : "")}>
@@ -612,11 +580,6 @@ function Section({ title, icon, summary, badge, defaultOpen = false, open, onTog
   );
 }
 
-// ============================================================================
-// 5. Effects UI
-// ============================================================================
-
-// Renders the individual settings card for a single effect.
 function EffectCard({ meta, eff, onChange }) {
   const [open, toggleOpen] = useRememberedOpen(`eff:${eff.id}`, false);
   const patch = (updates) => onChange({ ...eff, ...updates });
@@ -688,7 +651,6 @@ function EffectCard({ meta, eff, onChange }) {
   );
 }
 
-// Master tab component grouping all effect cards.
 function EffectsTab({ effects, onChange }) {
   const update = (id, updated) => onChange(
     effects.some(e => e.id === id)
@@ -726,10 +688,6 @@ function EffectsTab({ effects, onChange }) {
   );
 }
 
-// ============================================================================
-// 6. State management and import logic
-// ============================================================================
-
 const defaultConfig = () => ({
   sentences: ["Welcome 👋", "SVG Crafter"],
   sentenceAligns: ["left", "left"],
@@ -762,8 +720,7 @@ const defaultConfig = () => ({
   effects: EFFECT_DEFAULTS,
 });
 
-// Utility to handle Unicode strings safely when base64 encoding. 
-// Chunking prevents call-stack exceptions when handling particularly long strings.
+// Chunking avoids maximum call stack size limits in String.fromCharCode.
 const b64encode = (str) => {
   const bytes = new TextEncoder().encode(str);
   let bin = "";
@@ -778,9 +735,7 @@ const b64decode = (b64) => {
 
 const META_RE = /<metadata id="svgcrafter-config">([A-Za-z0-9+/=]+)<\/metadata>/;
 
-// We inject the state directly into the SVG as a `<metadata>` tag block. 
-// This allows users to re-upload their SVGs later to edit them seamlessly.
-// We strip out the embedded font binary because it bloats the file unnecessarily; we can easily re-fetch it from the Google Font name upon import.
+// Embeds configuration in SVG metadata for round-trip importing; omits font binaries to reduce payload size.
 function embedConfig(svg, config) {
   const rest = { ...config };
   delete rest.embedFont;
@@ -789,14 +744,12 @@ function embedConfig(svg, config) {
   return svg.slice(0, at) + meta + svg.slice(at);
 }
 
-// Ensures imported config files stay compatible if our default configuration schema updates.
-// Missing properties get backfilled with defaults, and legacy effect objects get merged safely.
 function sanitizeConfig(raw) {
   const base = defaultConfig();
   const cfg = { ...base, ...raw, embedFont: null };
 
   const sentences = (Array.isArray(cfg.sentences) ? cfg.sentences : base.sentences)
-    .slice(0, 6).map((t) => String(t ?? ""));
+    .slice(0, MAX_SENTENCES).map((t) => String(t ?? ""));
   if (!sentences.length) sentences.push("");
   const syncArr = (arr, fill) =>
     sentences.map((_, i) => (Array.isArray(arr) && arr[i] != null ? arr[i] : fill));
@@ -814,8 +767,7 @@ function sanitizeConfig(raw) {
   return cfg;
 }
 
-// Fallback legacy parser for SVGs created before we added the <metadata> config embedding.
-// It reverse-engineers the configuration out of the DOM nodes and attributes.
+// Reconstructs configuration from DOM attributes for legacy SVG exports.
 const LEGACY_EFFECT_MARKERS = {
   ltClip: "lightning", swClip: "soundwaves", ptClip: "particles", scClip: "scanlines",
   shimClip: "shimmer", prClip: "pulserings", mrClip: "matrixrain", bbClip: "borderbeam",
@@ -825,9 +777,8 @@ const LEGACY_EFFECT_MARKERS = {
 
 function parseLegacySvg(root, cssText) {
   const clampN = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
-  const texts = [...root.querySelectorAll("text")];
+  const texts = [...root.querySelectorAll("text")].slice(0, MAX_SENTENCES);
   
-  // A quick sanity check to confirm this SVG was actually generated by us before we try parsing it.
   const isOurs =
     root.querySelector('[id="textPaint"],[id="bgPaint"],[id="borderPaint"]') ||
     texts.some((t) => (t.getAttribute("class") || "").includes("tt")) ||
@@ -836,10 +787,9 @@ function parseLegacySvg(root, cssText) {
   if (!isOurs || !texts.length) return null;
 
   const cfg = defaultConfig();
-  const notes = [];
   
-  // We run each parsing stage in isolation so one failure doesn't ruin the entire recovery process.
-  const stage = (name, fn) => { try { fn(); } catch { notes.push(name); } };
+  // Isolated recovery stages ensure a single failure does not abort the entire import.
+  const stage = (fn) => { try { fn(); } catch { /* ignore stage failure */ } };
 
   const W = Number(root.getAttribute("width"));
   const H = Number(root.getAttribute("height"));
@@ -884,7 +834,7 @@ function parseLegacySvg(root, cssText) {
       brightness: 100, angle, anim, animSpeed, animReverse, stops };
   };
 
-  stage("background", () => {
+  stage(() => {
     const mainRect =
       [...root.children].find((el) =>
         el.tagName === "rect" && !el.hasAttribute("pathLength") &&
@@ -901,11 +851,11 @@ function parseLegacySvg(root, cssText) {
     }
   });
 
-  cfg.sentences = texts.map((t) => t.textContent).slice(0, 6);
+  cfg.sentences = texts.map((t) => t.textContent);
   const t0 = texts[0];
   let familyStr = FONTS[0].stack;
   
-  stage("text style", () => {
+  stage(() => {
     cfg.fontSize = Number(t0.getAttribute("font-size")) || cfg.fontSize;
     cfg.fontWeight = Number(t0.getAttribute("font-weight")) || cfg.fontWeight;
     cfg.glow = (t0.getAttribute("filter") || "").includes("glow");
@@ -925,7 +875,7 @@ function parseLegacySvg(root, cssText) {
     }
   });
 
-  stage("transition", () => {
+  stage(() => {
   const typingClip = root.querySelector('clipPath[id^="clip"] rect > animate[attributeName="width"]');
   if (typingClip) {
     cfg.transition = "typing";
@@ -956,7 +906,7 @@ function parseLegacySvg(root, cssText) {
   }
   });
 
-  stage("text motion", () => {
+  stage(() => {
   cfg.sentenceMotions = texts.map((t) => {
     const wrap = t.closest("g[class^=mv]");
     if (!wrap) return "none";
@@ -972,7 +922,7 @@ function parseLegacySvg(root, cssText) {
   });
 
   const PAD = 28;
-  stage("alignment", () => {
+  stage(() => {
   cfg.sentenceAligns = texts.map((t, i) => {
     if (t.hasAttribute("textLength")) return "justify";
     const x = Number(t.getAttribute("x")) || PAD;
@@ -1053,24 +1003,23 @@ function parseLegacySvg(root, cssText) {
           break;
         }
       }
-    } catch { notes.push(d.id); }
+    } catch {
+      // Ignore unsupported or partial effect metadata
+    }
     return eff;
   });
 
   return cfg;
 }
 
-// Master import flow: 
-// 1. Try metadata parse (lossless)
-// 2. Fall back to DOM scraping (lossy for legacy exports)
-// 3. Fall back to raw bounds and text extraction (so foreign SVGs don't crash the app)
+// 3-tier import: lossless embedded metadata, legacy SVG DOM scraping, or raw bounds/text extraction.
 function parseImportedSvg(text) {
   const m = text.match(META_RE);
   if (m) {
     try {
       return { config: sanitizeConfig(JSON.parse(b64decode(m[1]))), foreign: false };
-    } catch { 
-      // If metadata is corrupted, continue down the chain to try the legacy parser.
+    } catch {
+      // Fall through to DOM scraping if metadata is unparseable
     }
   }
 
@@ -1082,13 +1031,13 @@ function parseImportedSvg(text) {
     const cssText = [...root.querySelectorAll("style")].map((st) => st.textContent).join("\n");
     const legacy = parseLegacySvg(root, cssText);
     if (legacy) return { config: sanitizeConfig(legacy), foreign: false, legacy: true };
-  } catch { 
-    // Handled below if it fails.
+  } catch {
+    // Fall through to basic bounds/text extraction
   }
 
   const cfg = defaultConfig();
   const texts = [...root.querySelectorAll("text")]
-    .map((t) => t.textContent.trim()).filter(Boolean).slice(0, 6);
+    .map((t) => t.textContent.trim()).filter(Boolean).slice(0, MAX_SENTENCES);
   if (texts.length) {
     cfg.sentences = texts;
     cfg.sentenceAligns = texts.map(() => "left");
@@ -1102,10 +1051,6 @@ function parseImportedSvg(text) {
   if (h > 0) { cfg.autoHeight = false; cfg.bannerHeight = Math.round(h); }
   return { config: cfg, foreign: true };
 }
-
-// ============================================================================
-// 7. Main app
-// ============================================================================
 
 export default function App() {
   const [tab, setTab] = useState("text");

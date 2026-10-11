@@ -1,10 +1,4 @@
-// This is the core engine. It takes the user's configuration and spits out a standalone SVG string.
-// We strictly use CSS and SMIL animations here (no JavaScript in the SVG) so it plays nicely with GitHub's image proxy. 
-// It's also fully decoupled from the DOM, making it very easy to test in isolation.
-
-// ============================================================================
-// 1. Constants and utility functions
-// ============================================================================
+// SVG output uses CSS and SMIL animations exclusively; inline JS is sanitized by GitHub image proxies.
 
 const FONT_STACK = "'Segoe UI', system-ui, -apple-system, Arial, sans-serif";
 const CHAR_TYPE = 0.13;
@@ -24,17 +18,13 @@ export function autoSize(sentences = [], fontSize = 40) {
 function seededRand(seed) {
   let s = (seed >>> 0) || 1;
   const next = () => { s = Math.imul(s, 48271) >>> 0; return s / 4294967296; };
-  // Warm up the PRNG generator: discarding the first few outputs prevents early bias towards low numbers which can make the visual effects cluster unnaturally.
+  // Discard initial outputs to avoid early seed correlation.
   for (let i = 0; i < 5; i++) next();
   return next;
 }
 
-// ============================================================================
-// 2. Colours and gradients
-// ============================================================================
-
 function hexToRgb(hex) {
-  let h = String(hex).replace("#", "");
+  let h = String(hex).trim().replace("#", "");
   if (h.length === 3) h = h.split("").map((c) => c + c).join("");
   const n = parseInt(h, 16) || 0;
   return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
@@ -51,8 +41,6 @@ export function adjustBrightness(hex, brightness = 100) {
   return rgbToHex(r * f, g * f, b * f);
 }
 
-// Utility for shifting hex colors along the hue wheel. 
-// Very handy for procedurally generating palettes for things like confetti or auroras based entirely on the user's primary selected color.
 function hueShift(hex, deg) {
   const { r, g, b } = hexToRgb(hex);
   const rf = r / 255, gf = g / 255, bf = b / 255;
@@ -104,7 +92,7 @@ function gradientAnim(paint, c) {
       el: `\n      <animateTransform attributeName="gradientTransform" type="rotate" from="${from}" to="${to}" dur="${dur}s" repeatCount="indefinite"/>`,
     };
   }
-  // To avoid an ugly seam when the gradient animates linearly, we use spreadMethod="reflect" to bounce the colors back seamlessly.
+  // Reflect gradient spread prevents visible seams during linear translation.
   const dur = round(36 / speed, 2);
   let dx = round(2 * (c.x2 - c.x1), 4), dy = round(2 * (c.y2 - c.y1), 4);
   if (reverse) { dx = -dx; dy = -dy; }
@@ -141,12 +129,7 @@ function paintMain(paint) {
   return s ? { color: adjustBrightness(s.color, s.brightness), opacity: op(s.opacity) } : { color: "#000000", opacity: 1 };
 }
 
-// ============================================================================
-// 3. Timeline and transition calculations
-// ============================================================================
-
-// Calculates the timeline values for the typewriter effect. 
-// It builds an array of animation stops for when characters should appear/disappear based on your configured speeds and hold duration.
+// Builds keyframe timing stops for typewriter transitions.
 function buildTimeline(sentences, mode, holdDuration, speed = 1) {
   const isChar = mode === "char";
   const ct = CHAR_TYPE / speed;
@@ -196,7 +179,7 @@ function buildTimeline(sentences, mode, holdDuration, speed = 1) {
   return { T, slots, perSentence: slots.map(toFull), cursorPts };
 }
 
-function toAnim(points, T, valueFn = (w) => w) {
+function toAnim(points, T) {
   const cleaned = [];
   for (const [t, w] of points) {
     const tt = clamp(t, 0, T);
@@ -207,7 +190,7 @@ function toAnim(points, T, valueFn = (w) => w) {
   if (cleaned[0][0] > 1e-6) cleaned.unshift([0, cleaned[0][1]]);
   if (Math.abs(cleaned[cleaned.length - 1][0] - T) > 1e-6) cleaned.push([T, cleaned[cleaned.length - 1][1]]);
   const keyTimes = cleaned.map(([t]) => round(t / T, 6));
-  const values = cleaned.map(([, w]) => round(valueFn(w), 1));
+  const values = cleaned.map(([, w]) => round(w, 1));
   for (let i = 1; i < keyTimes.length; i++) if (keyTimes[i] <= keyTimes[i - 1]) keyTimes[i] = Math.min(1, keyTimes[i - 1] + 1e-6);
   keyTimes[0] = 0;
   keyTimes[keyTimes.length - 1] = 1;
@@ -306,12 +289,7 @@ function buildMotion(id, index, fontSize, speed = 1) {
   return { className: name, css };
 }
 
-// ============================================================================
-// 4. Effect generators
-// ============================================================================
-
-// Lightning effect: Generates jagged lines from the edges inward. 
-// We use a negative animation delay here so the bolts are already flashing when the SVG loads, avoiding an initial blank frame.
+// Negative animation delays ensure effects appear in-flight immediately on initial render.
 function buildLightning(cfg, W, H, br) {
   const color  = cfg.color  || "#a78bfa";
   const o      = op(cfg.opacity  ?? 85);
@@ -397,8 +375,6 @@ function buildLightning(cfg, W, H, br) {
   return { defs, els, css: css.join("\n    ") };
 }
 
-// Sound Waves: Animating the 'd' property smoothly to travel across the banner rather than just flapping vertically. 
-// Alternate rows use opposing directions to make the effect feel dynamic.
 function buildSoundWaves(cfg, W, H, br) {
   const color  = cfg.color     || "#38bdf8";
   const o      = op(cfg.opacity ?? 45);
@@ -447,7 +423,6 @@ function buildSoundWaves(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// Particles drifting upward. Staggering negative starts ensures the effect looks completely underway by the time the first frame paints.
 function buildParticles(cfg, W, H, br) {
   const color = cfg.color  || "#f472b6";
   const o     = op(cfg.opacity ?? 70);
@@ -484,7 +459,6 @@ function buildParticles(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// Generates a CRT grid layout. We clip the grid explicitly so no lines poke weirdly out of the rounded corners.
 function buildScanlines(cfg, W, H, br) {
   const color   = cfg.color      || "#ffffff";
   const o       = op(cfg.opacity  ?? 18);
@@ -526,7 +500,6 @@ function buildScanlines(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// Creates a diagonal gloss effect using a linear gradient and custom splines to create a sweeping dwell period.
 function buildShimmer(cfg, W, H, br) {
   const color = cfg.color      || "#ffffff";
   const o     = op(cfg.opacity  ?? 55);
@@ -571,8 +544,6 @@ function buildShimmer(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// Expanding circular rings. 
-// Uses splines for the pop-out sizing, fading out slowly so it feels dynamic instead of rigid.
 function buildPulseRings(cfg, W, H, br) {
   const color = cfg.color  || "#818cf8";
   const o     = op(cfg.opacity ?? 60);
@@ -603,7 +574,6 @@ function buildPulseRings(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// Matrix rain. To create the iconic falling code look within SMIL's limits, we use dashed lines travelling downward, paired with a brighter leading "head" dot.
 function buildMatrixRain(cfg, W, H, br) {
   const color   = cfg.color    || "#4ade80";
   const o       = op(cfg.opacity ?? 55);
@@ -645,8 +615,6 @@ function buildMatrixRain(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// Border beam. We use the pathLength property combined with stroke-dashoffset to easily drive dashes around our perimeter.
-// Stacking different stroke thicknesses lets us fake a glowing tail for the comet.
 function buildBorderBeam(cfg, W, H, br) {
   const color = cfg.color || "#38bdf8";
   const o     = op(cfg.opacity ?? 90);
@@ -688,7 +656,6 @@ function buildBorderBeam(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// 4-point star sparkles. Uses simple SVG paths popping scale and opacity via SMIL keyTimes.
 function buildSparkles(cfg, W, H, br) {
   const color = cfg.color || "#fde047";
   const o     = op(cfg.opacity ?? 85);
@@ -729,7 +696,6 @@ function buildSparkles(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// Generates an array of falling confetti blocks. We assign colours automatically generated from the user's base tint.
 function buildConfetti(cfg, W, H, br) {
   const color = cfg.color || "#f472b6";
   const o     = op(cfg.opacity ?? 90);
@@ -772,7 +738,6 @@ function buildConfetti(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// Aurora drift. We use SVGs gaussian blur here along with hue shifting to create organic feeling back-glow blobs.
 function buildAurora(cfg, W, H, br) {
   const color = cfg.color || "#22d3ee";
   const o     = op(cfg.opacity ?? 45);
@@ -814,7 +779,6 @@ function buildAurora(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// Uses stacking blurs at different rates to create a simulated depth-of-field effect.
 function buildBlurrylights(cfg, W, H, br) {
   const color = cfg.color || "#fbbf24";
   const o     = op(cfg.opacity ?? 45);
@@ -855,7 +819,6 @@ function buildBlurrylights(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// Grid generation using simple geometry and SMIL perspective easing for that synthwave infinite floor aesthetic.
 function buildSynthGrid(cfg, W, H, br) {
   const color = cfg.color || "#ff2d95";
   const o     = op(cfg.opacity ?? 55);
@@ -905,7 +868,6 @@ function buildSynthGrid(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// The starfield streaks use a similar trick to the border beam, shooting out rapidly via stroke-dashoffset on invisible lines.
 function buildStarfield(cfg, W, H, br) {
   const color  = cfg.color || "#dbeafe";
   const o      = op(cfg.opacity ?? 70);
@@ -946,7 +908,6 @@ function buildStarfield(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// Sits at the top of the effect stack providing edge darkening and subtle opacity steps(1) flickers.
 function buildVignette(cfg, W, H, br) {
   const color   = cfg.color || "#000000";
   const o       = op(cfg.opacity ?? 60);
@@ -980,10 +941,6 @@ function buildVignette(cfg, W, H, br) {
   return { defs, els, css: "" };
 }
 
-// ============================================================================
-// 5. Dispatcher and main generator
-// ============================================================================
-
 function buildEffects(effects, W, H, br) {
   if (!effects || !effects.length) return { defs: [], els: [], css: "" };
   const allDefs = [], allEls = [], allCss = [];
@@ -991,21 +948,23 @@ function buildEffects(effects, W, H, br) {
   for (const eff of effects) {
     if (!eff || !eff.enabled) continue;
     let r = null;
-    if (eff.id === "lightning")     r = buildLightning(eff,     W, H, br);
-    if (eff.id === "soundwaves")    r = buildSoundWaves(eff,    W, H, br);
-    if (eff.id === "particles")     r = buildParticles(eff,     W, H, br);
-    if (eff.id === "scanlines")     r = buildScanlines(eff,     W, H, br);
-    if (eff.id === "shimmer")       r = buildShimmer(eff,       W, H, br);
-    if (eff.id === "pulserings")    r = buildPulseRings(eff,    W, H, br);
-    if (eff.id === "matrixrain")    r = buildMatrixRain(eff,    W, H, br);
-    if (eff.id === "borderbeam")    r = buildBorderBeam(eff,    W, H, br);
-    if (eff.id === "sparkles")      r = buildSparkles(eff,      W, H, br);
-    if (eff.id === "confetti")      r = buildConfetti(eff,      W, H, br);
-    if (eff.id === "aurora")        r = buildAurora(eff,        W, H, br);
-    if (eff.id === "blurrylights")  r = buildBlurrylights(eff,  W, H, br);
-    if (eff.id === "synthgrid")     r = buildSynthGrid(eff,     W, H, br);
-    if (eff.id === "starfield")     r = buildStarfield(eff,     W, H, br);
-    if (eff.id === "vignette")      r = buildVignette(eff,      W, H, br);
+    switch (eff.id) {
+      case "lightning":    r = buildLightning(eff, W, H, br); break;
+      case "soundwaves":   r = buildSoundWaves(eff, W, H, br); break;
+      case "particles":    r = buildParticles(eff, W, H, br); break;
+      case "scanlines":    r = buildScanlines(eff, W, H, br); break;
+      case "shimmer":      r = buildShimmer(eff, W, H, br); break;
+      case "pulserings":   r = buildPulseRings(eff, W, H, br); break;
+      case "matrixrain":   r = buildMatrixRain(eff, W, H, br); break;
+      case "borderbeam":   r = buildBorderBeam(eff, W, H, br); break;
+      case "sparkles":     r = buildSparkles(eff, W, H, br); break;
+      case "confetti":     r = buildConfetti(eff, W, H, br); break;
+      case "aurora":       r = buildAurora(eff, W, H, br); break;
+      case "blurrylights": r = buildBlurrylights(eff, W, H, br); break;
+      case "synthgrid":    r = buildSynthGrid(eff, W, H, br); break;
+      case "starfield":    r = buildStarfield(eff, W, H, br); break;
+      case "vignette":     r = buildVignette(eff, W, H, br); break;
+    }
     if (!r) continue;
     allDefs.push(...r.defs);
     allEls.push(...r.els);
@@ -1185,10 +1144,6 @@ export function generateSvg(config) {
   ].filter(Boolean).join("\n  ");
   return wrap(width, height, geo[0].text, inner, linkUrl);
 }
-
-// ----------------------------------------------------------------------------
-// MISCELLANEOUS UTILITIES
-// ----------------------------------------------------------------------------
 
 function wrap(width, height, label, inner, linkUrl = "") {
   const link = normalizeUrl(linkUrl);
