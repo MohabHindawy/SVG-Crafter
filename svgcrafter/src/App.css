@@ -48,26 +48,6 @@ body {
 
 .app { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
-/* ---- header ---- */
-.topbar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 22px; border-bottom: 1px solid var(--border); flex: none;
-}
-.brand { display: flex; align-items: baseline; gap: 12px; }
-.wordmark { font-family: var(--font-display); font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
-.wordmark .accent {
-  background: linear-gradient(120deg, var(--accent-2), var(--accent));
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-}
-.brand .dot {
-  align-self: center;
-  width: 11px; height: 11px; border-radius: 50%;
-  background: linear-gradient(120deg, var(--accent-2), var(--accent));
-  box-shadow: 0 0 14px var(--glow);
-}
-.tagline { color: var(--muted); font-size: 13px; font-weight: 500; }
-@media (max-width: 560px) { .tagline { display: none; } }
-
 .workspace { flex: 1; display: flex; min-height: 0; }
 
 .sidebar {
@@ -85,19 +65,85 @@ body {
   padding: 22px; overflow-y: auto;
 }
 
-@media (max-width: 1100px) {
-  .sidebar { width: 340px; }
-  .export { width: 300px; }
+/* ---- repository callout / star prompt ---- */
+.repo-callout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.repo-callout-msg {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.repo-star-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  text-decoration: none;
+  cursor: pointer;
+  flex: none;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  box-shadow: 0 1px 0 rgba(27, 31, 36, 0.04);
+}
+.repo-star-btn:hover {
+  background: #30363d;
+  border-color: #8b949e;
+  color: #ffffff;
+}
+.repo-star-btn .star-icon {
+  color: #e3b341;
+  flex: none;
 }
 
-/* Stack on small screens with normal page scroll. */
+/* ---- responsive layout ---- */
+@media (max-width: 1100px) {
+  .sidebar { width: 320px; }
+  .main { flex-direction: column; }
+  .export {
+    width: auto;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+}
+
+/* Stack on small screens with normal page scroll */
 @media (max-width: 860px) {
-  .app { height: auto; overflow: visible; }
+  .app { height: auto; min-height: 100vh; overflow: visible; }
   .workspace { display: block; }
-  .sidebar { width: auto; border-right: none; border-bottom: 1px solid var(--border); overflow: visible; }
+  .sidebar {
+    width: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    overflow: visible;
+  }
+  .tabs {
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { flex: none; }
   .main { display: block; }
   .preview { overflow: visible; }
-  .export { width: auto; border-left: none; border-top: 1px solid var(--border); overflow: visible; }
+  .export { overflow: visible; }
+}
+
+@media (max-width: 520px) {
+  .preview, .export, .tabpanel { padding: 14px; }
+  .actions { flex-direction: column; gap: 8px; }
+  .actions button, .import-btn { width: 100%; }
 }
 
 /* ---- sidebar tabs (sticky underline) ---- */
