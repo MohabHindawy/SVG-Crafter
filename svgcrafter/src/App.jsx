@@ -1686,7 +1686,7 @@ export default function App() {
             <button onClick={() => copy(exportSvg, "svg")}>{copied === "svg" ? "Copied" : "Copy SVG"}</button>
             <button onClick={download}>Download .svg</button>
             <label className="import-btn">
-              Import SVG
+              <span>Import SVG</span>
               <input
                 type="file"
                 accept=".svg,image/svg+xml"

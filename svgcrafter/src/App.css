@@ -341,22 +341,20 @@ input:disabled { opacity: 0.45; cursor: not-allowed; }
 .stage img { max-width: 100%; }
 
 .actions { display: flex; gap: 12px; margin-bottom: 22px; }
-.actions button {
-  flex: 1; background: var(--success); color: #ffffff; border: 1px solid rgba(240, 246, 252, 0.1);
-  border-radius: 6px; font-family: var(--font-body); font-weight: 600; font-size: 14px;
-  padding: 5px 16px; min-height: 32px; cursor: pointer; transition: background 0.15s, border-color 0.15s;
+.actions button,
+.import-btn {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center;
+  text-align: center; background: var(--success); color: #ffffff;
+  border: 1px solid rgba(240, 246, 252, 0.1); border-radius: 6px;
+  font-family: var(--font-body); font-weight: 600; font-size: 14px; line-height: 20px;
+  padding: 5px 16px; min-height: 32px; cursor: pointer; user-select: none;
+  box-sizing: border-box;
+  transition: background 0.15s, border-color 0.15s;
   box-shadow: 0 1px 0 rgba(27,31,36,0.1), inset 0 1px 0 rgba(255,255,255,0.03);
 }
-.actions button:hover { background: var(--success-hover); }
-.actions button:active { transform: scale(0.98); }
-.import-btn {
-  flex: 1; display: flex; align-items: center; justify-content: center;
-  background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
-  border-radius: 6px; font-family: var(--font-body); font-weight: 600; font-size: 14px;
-  padding: 5px 16px; min-height: 32px; cursor: pointer; transition: background 0.15s, border-color 0.15s;
-  box-shadow: 0 1px 0 rgba(27,31,36,0.04), inset 0 1px 0 rgba(255,255,255,0.05);
-}
-.import-btn:hover { background: #30363d; border-color: #8b949e; }
+.actions button:hover,
+.import-btn:hover { background: var(--success-hover); }
+.actions button:active,
 .import-btn:active { transform: scale(0.98); }
 
 .import-note { margin: -12px 0 18px; font-size: 12px; font-weight: 600; }
