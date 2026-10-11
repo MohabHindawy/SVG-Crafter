@@ -12,12 +12,18 @@ const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 export function autoSize(sentences = [], fontSize = 40) {
   const widths = sentences.map((s) => s.width || 0);
   const maxWidth = Math.max(...widths, 40);
-  return { width: Math.round(maxWidth + PADDING * 2), height: Math.round(fontSize * 2.2) };
+  return {
+    width: Math.round(maxWidth + PADDING * 2),
+    height: Math.round(fontSize * 2.2),
+  };
 }
 
 function seededRand(seed) {
-  let s = (seed >>> 0) || 1;
-  const next = () => { s = Math.imul(s, 48271) >>> 0; return s / 4294967296; };
+  let s = seed >>> 0 || 1;
+  const next = () => {
+    s = Math.imul(s, 48271) >>> 0;
+    return s / 4294967296;
+  };
   // Discard initial outputs to avoid early seed correlation.
   for (let i = 0; i < 5; i++) next();
   return next;
@@ -25,13 +31,22 @@ function seededRand(seed) {
 
 function hexToRgb(hex) {
   let h = String(hex).trim().replace("#", "");
-  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  if (h.length === 3)
+    h = h
+      .split("")
+      .map((c) => c + c)
+      .join("");
   const n = parseInt(h, 16) || 0;
   return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
 }
 
 function rgbToHex(r, g, b) {
-  return "#" + [r, g, b].map((v) => clamp(Math.round(v), 0, 255).toString(16).padStart(2, "0")).join("");
+  return (
+    "#" +
+    [r, g, b]
+      .map((v) => clamp(Math.round(v), 0, 255).toString(16).padStart(2, "0"))
+      .join("")
+  );
 }
 
 export function adjustBrightness(hex, brightness = 100) {
@@ -43,10 +58,14 @@ export function adjustBrightness(hex, brightness = 100) {
 
 function hueShift(hex, deg) {
   const { r, g, b } = hexToRgb(hex);
-  const rf = r / 255, gf = g / 255, bf = b / 255;
-  const mx = Math.max(rf, gf, bf), mn = Math.min(rf, gf, bf);
+  const rf = r / 255,
+    gf = g / 255,
+    bf = b / 255;
+  const mx = Math.max(rf, gf, bf),
+    mn = Math.min(rf, gf, bf);
   const l = (mx + mn) / 2;
-  let h = 0, s = 0;
+  let h = 0,
+    s = 0;
   if (mx !== mn) {
     const d = mx - mn;
     s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
@@ -63,19 +82,28 @@ function hueShift(hex, deg) {
     return p;
   };
   let r2, g2, b2;
-  if (s === 0) { r2 = g2 = b2 = l; }
-  else {
+  if (s === 0) {
+    r2 = g2 = b2 = l;
+  } else {
     const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
     const p = 2 * l - q;
-    r2 = hue2(p, q, h + 1 / 3); g2 = hue2(p, q, h); b2 = hue2(p, q, h - 1 / 3);
+    r2 = hue2(p, q, h + 1 / 3);
+    g2 = hue2(p, q, h);
+    b2 = hue2(p, q, h - 1 / 3);
   }
   return rgbToHex(r2 * 255, g2 * 255, b2 * 255);
 }
 
 function angleToCoords(angle) {
   const a = (Number(angle) * Math.PI) / 180;
-  const dx = Math.cos(a), dy = Math.sin(a);
-  return { x1: round(0.5 - dx / 2), y1: round(0.5 - dy / 2), x2: round(0.5 + dx / 2), y2: round(0.5 + dy / 2) };
+  const dx = Math.cos(a),
+    dy = Math.sin(a);
+  return {
+    x1: round(0.5 - dx / 2),
+    y1: round(0.5 - dy / 2),
+    x2: round(0.5 + dx / 2),
+    y2: round(0.5 + dy / 2),
+  };
 }
 
 function gradientAnim(paint, c) {
@@ -94,8 +122,12 @@ function gradientAnim(paint, c) {
   }
   // Reflect gradient spread prevents visible seams during linear translation.
   const dur = round(36 / speed, 2);
-  let dx = round(2 * (c.x2 - c.x1), 4), dy = round(2 * (c.y2 - c.y1), 4);
-  if (reverse) { dx = -dx; dy = -dy; }
+  let dx = round(2 * (c.x2 - c.x1), 4),
+    dy = round(2 * (c.y2 - c.y1), 4);
+  if (reverse) {
+    dx = -dx;
+    dy = -dy;
+  }
   return {
     spread: ` spreadMethod="reflect"`,
     el: `\n      <animateTransform attributeName="gradientTransform" type="translate" from="0 0" to="${dx} ${dy}" dur="${dur}s" repeatCount="indefinite"/>`,
@@ -105,13 +137,17 @@ function gradientAnim(paint, c) {
 function resolvePaint(paint, id, defs) {
   if (!paint) return { fill: "#000000", opacity: 1 };
   if (paint.type !== "gradient") {
-    return { fill: adjustBrightness(paint.color, paint.brightness), opacity: op(paint.opacity) };
+    return {
+      fill: adjustBrightness(paint.color, paint.brightness),
+      opacity: op(paint.opacity),
+    };
   }
   const stops = paint.stops || [];
   const c = angleToCoords(paint.angle || 0);
   const stopEls = stops
     .map((s, i) => {
-      const offset = stops.length <= 1 ? 0 : round((i / (stops.length - 1)) * 100, 2);
+      const offset =
+        stops.length <= 1 ? 0 : round((i / (stops.length - 1)) * 100, 2);
       return `<stop offset="${offset}%" stop-color="${adjustBrightness(s.color, s.brightness)}" stop-opacity="${op(s.opacity)}"/>`;
     })
     .join("\n      ");
@@ -124,9 +160,15 @@ function resolvePaint(paint, id, defs) {
 
 function paintMain(paint) {
   if (!paint) return { color: "#000000", opacity: 1 };
-  if (paint.type !== "gradient") return { color: adjustBrightness(paint.color, paint.brightness), opacity: op(paint.opacity) };
+  if (paint.type !== "gradient")
+    return {
+      color: adjustBrightness(paint.color, paint.brightness),
+      opacity: op(paint.opacity),
+    };
   const s = paint.stops?.[0];
-  return s ? { color: adjustBrightness(s.color, s.brightness), opacity: op(s.opacity) } : { color: "#000000", opacity: 1 };
+  return s
+    ? { color: adjustBrightness(s.color, s.brightness), opacity: op(s.opacity) }
+    : { color: "#000000", opacity: 1 };
 }
 
 // Builds keyframe timing stops for typewriter transitions.
@@ -142,11 +184,14 @@ function buildTimeline(sentences, mode, holdDuration, speed = 1) {
   });
   const T = slots.reduce((a, s) => a + s.D, 0) || 1;
   let acc = 0;
-  slots.forEach((s) => { s.S = acc; acc += s.D; });
+  slots.forEach((s) => {
+    s.S = acc;
+    acc += s.D;
+  });
 
   const prefix = (s, k) => {
     const P = s.prefixes || [];
-    return P[clamp(k, 0, P.length - 1)] ?? (s.width * (k / s.N));
+    return P[clamp(k, 0, P.length - 1)] ?? s.width * (k / s.N);
   };
 
   const slotPoints = (s) => {
@@ -159,7 +204,8 @@ function buildTimeline(sentences, mode, holdDuration, speed = 1) {
     const holdEnd = s.typeDur + holdDuration;
     pts.push([holdEnd, s.width]);
     if (isChar) {
-      for (let k = s.N - 1; k >= 0; k--) pts.push([holdEnd + (s.N - k) * cd, prefix(s, k)]);
+      for (let k = s.N - 1; k >= 0; k--)
+        pts.push([holdEnd + (s.N - k) * cd, prefix(s, k)]);
     } else {
       pts.push([holdEnd + s.delDur, 0]);
     }
@@ -175,7 +221,9 @@ function buildTimeline(sentences, mode, holdDuration, speed = 1) {
   };
 
   const cursorPts = [];
-  for (const s of slots) for (const [t, w] of slotPoints(s)) cursorPts.push([s.S + t, (s.startX || 0) + w]);
+  for (const s of slots)
+    for (const [t, w] of slotPoints(s))
+      cursorPts.push([s.S + t, (s.startX || 0) + w]);
   return { T, slots, perSentence: slots.map(toFull), cursorPts };
 }
 
@@ -183,15 +231,21 @@ function toAnim(points, T) {
   const cleaned = [];
   for (const [t, w] of points) {
     const tt = clamp(t, 0, T);
-    if (cleaned.length && Math.abs(cleaned[cleaned.length - 1][0] - tt) < 1e-6) {
+    if (
+      cleaned.length &&
+      Math.abs(cleaned[cleaned.length - 1][0] - tt) < 1e-6
+    ) {
       cleaned[cleaned.length - 1][1] = w;
     } else cleaned.push([tt, w]);
   }
   if (cleaned[0][0] > 1e-6) cleaned.unshift([0, cleaned[0][1]]);
-  if (Math.abs(cleaned[cleaned.length - 1][0] - T) > 1e-6) cleaned.push([T, cleaned[cleaned.length - 1][1]]);
+  if (Math.abs(cleaned[cleaned.length - 1][0] - T) > 1e-6)
+    cleaned.push([T, cleaned[cleaned.length - 1][1]]);
   const keyTimes = cleaned.map(([t]) => round(t / T, 6));
   const values = cleaned.map(([, w]) => round(w, 1));
-  for (let i = 1; i < keyTimes.length; i++) if (keyTimes[i] <= keyTimes[i - 1]) keyTimes[i] = Math.min(1, keyTimes[i - 1] + 1e-6);
+  for (let i = 1; i < keyTimes.length; i++)
+    if (keyTimes[i] <= keyTimes[i - 1])
+      keyTimes[i] = Math.min(1, keyTimes[i - 1] + 1e-6);
   keyTimes[0] = 0;
   keyTimes[keyTimes.length - 1] = 1;
   return { keyTimes: keyTimes.join(";"), values: values.join(";") };
@@ -202,13 +256,29 @@ function transitionStates(kind, width, fontSize) {
   const dy = round(fontSize * 0.9, 1);
   switch (kind) {
     case "zoom":
-      return { enter: "opacity:0;transform:scale(0.82)", vis: "opacity:1;transform:scale(1)", exit: "opacity:0;transform:scale(0.82)" };
+      return {
+        enter: "opacity:0;transform:scale(0.82)",
+        vis: "opacity:1;transform:scale(1)",
+        exit: "opacity:0;transform:scale(0.82)",
+      };
     case "slide":
-      return { enter: `opacity:0;transform:translateX(${dx}px)`, vis: "opacity:1;transform:translateX(0)", exit: `opacity:0;transform:translateX(${-dx}px)` };
+      return {
+        enter: `opacity:0;transform:translateX(${dx}px)`,
+        vis: "opacity:1;transform:translateX(0)",
+        exit: `opacity:0;transform:translateX(${-dx}px)`,
+      };
     case "rise":
-      return { enter: `opacity:0;transform:translateY(${dy}px)`, vis: "opacity:1;transform:translateY(0)", exit: `opacity:0;transform:translateY(${-dy}px)` };
+      return {
+        enter: `opacity:0;transform:translateY(${dy}px)`,
+        vis: "opacity:1;transform:translateY(0)",
+        exit: `opacity:0;transform:translateY(${-dy}px)`,
+      };
     case "blur":
-      return { enter: "opacity:0;filter:blur(6px)", vis: "opacity:1;filter:blur(0)", exit: "opacity:0;filter:blur(6px)" };
+      return {
+        enter: "opacity:0;filter:blur(6px)",
+        vis: "opacity:1;filter:blur(0)",
+        exit: "opacity:0;filter:blur(6px)",
+      };
     case "fade":
     default:
       return { enter: "opacity:0", vis: "opacity:1", exit: "opacity:0" };
@@ -229,22 +299,35 @@ function buildTransitionCss(count, kind, hold, trans, width, fontSize) {
     let frames;
     if (tExitEnd <= T + 1e-6) {
       frames = [
-        [0, st.enter], [pct(start), st.enter], [pct(tEnterEnd), st.vis],
-        [pct(tHoldEnd), st.vis], [pct(tExitEnd), st.exit], [100, st.enter],
+        [0, st.enter],
+        [pct(start), st.enter],
+        [pct(tEnterEnd), st.vis],
+        [pct(tHoldEnd), st.vis],
+        [pct(tExitEnd), st.exit],
+        [100, st.enter],
       ];
     } else {
       frames = [
-        [0, st.vis], [pct(tExitEnd - T), st.exit],
-        [pct(start), st.enter], [pct(tEnterEnd), st.vis], [100, st.vis],
+        [0, st.vis],
+        [pct(tExitEnd - T), st.exit],
+        [pct(start), st.enter],
+        [pct(tEnterEnd), st.vis],
+        [100, st.vis],
       ];
     }
     frames.sort((a, b) => a[0] - b[0]);
     const seen = new Map();
     for (const [p, decl] of frames) seen.set(p, decl);
-    const stops = [...seen.entries()].map(([p, decl]) => `${p}% { ${decl} }`).join(" ");
+    const stops = [...seen.entries()]
+      .map(([p, decl]) => `${p}% { ${decl} }`)
+      .join(" ");
     rules.push(`@keyframes tkf${i} { ${stops} }`);
   }
-  const anims = Array.from({ length: count }, (_, i) => `.tt${i} { animation: tkf${i} ${round(T, 2)}s ease-in-out infinite; }`).join(" ");
+  const anims = Array.from(
+    { length: count },
+    (_, i) =>
+      `.tt${i} { animation: tkf${i} ${round(T, 2)}s ease-in-out infinite; }`,
+  ).join(" ");
   const css = `.tt { transform-box: fill-box; transform-origin: center; }\n    ${rules.join("\n    ")}\n    ${anims}`;
   return { css, dur: T };
 }
@@ -252,36 +335,38 @@ function buildTransitionCss(count, kind, hold, trans, width, fontSize) {
 // Wraps text nodes in a group `<g>` that handles continuous loop animations (float, bob, sway, etc.) completely separate from the core transition logic.
 function buildMotion(id, index, fontSize, speed = 1) {
   if (!id || id === "none") return null;
-  const A = Math.max(3, fontSize * 0.14);          
+  const A = Math.max(3, fontSize * 0.14);
   const spd = clamp(Number(speed) || 1, 0.25, 4);
-  const dur = round(4 / spd, 2);                   
+  const dur = round(4 / spd, 2);
   const name = `mv${index}`;
   const delay = round(-(index * 0.35), 2);
   let frames;
   switch (id) {
-    case "float": 
+    case "float":
       frames = `0%{transform:translate(0,0)}25%{transform:translate(${round(A * 0.6, 1)}px,${round(-A, 1)}px)}50%{transform:translate(0,${round(-A * 0.4, 1)}px)}75%{transform:translate(${round(-A * 0.6, 1)}px,${round(-A, 1)}px)}100%{transform:translate(0,0)}`;
       break;
-    case "bob": 
+    case "bob":
       frames = `0%,100%{transform:translateY(${round(A, 1)}px)}50%{transform:translateY(${round(-A, 1)}px)}`;
       break;
-    case "sway": 
+    case "sway":
       frames = `0%,100%{transform:translateX(${round(-A * 1.3, 1)}px)}50%{transform:translateX(${round(A * 1.3, 1)}px)}`;
       break;
-    case "pulse": 
+    case "pulse":
       frames = `0%,100%{transform:scale(1)}50%{transform:scale(1.06)}`;
       break;
-    case "wobble": 
+    case "wobble":
       frames = `0%,100%{transform:rotate(-2.2deg)}50%{transform:rotate(2.2deg)}`;
       break;
-    case "orbit": 
+    case "orbit":
       frames = `0%{transform:translate(${round(A, 1)}px,0)}25%{transform:translate(0,${round(A, 1)}px)}50%{transform:translate(${round(-A, 1)}px,0)}75%{transform:translate(0,${round(-A, 1)}px)}100%{transform:translate(${round(A, 1)}px,0)}`;
       break;
     default:
       return null;
   }
-  const timing = id === "pulse" || id === "wobble" || id === "bob" || id === "sway"
-    ? "ease-in-out" : "linear";
+  const timing =
+    id === "pulse" || id === "wobble" || id === "bob" || id === "sway"
+      ? "ease-in-out"
+      : "linear";
   const css =
     `@keyframes ${name}{${frames}}` +
     `.${name}{animation:${name} ${dur}s ${delay}s ${timing} infinite;` +
@@ -291,37 +376,51 @@ function buildMotion(id, index, fontSize, speed = 1) {
 
 // Negative animation delays ensure effects appear in-flight immediately on initial render.
 function buildLightning(cfg, W, H, br) {
-  const color  = cfg.color  || "#a78bfa";
-  const o      = op(cfg.opacity  ?? 85);
-  const speed  = clamp(Number(cfg.speed)  || 5, 1, 10);
-  const bolts  = clamp(Math.round(cfg.bolts ?? 3), 1, 6);
+  const color = cfg.color || "#a78bfa";
+  const o = op(cfg.opacity ?? 85);
+  const speed = clamp(Number(cfg.speed) || 5, 1, 10);
+  const bolts = clamp(Math.round(cfg.bolts ?? 3), 1, 6);
   const jitter = clamp(Number(cfg.jitter) || 8, 2, 20);
 
-  const cycle = round(9 / speed + 1.5, 2); 
-  const core  = adjustBrightness(color, 165);
-  const defs  = [`<clipPath id="ltClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`];
-  const els   = [];
-  const css   = [];
+  const cycle = round(9 / speed + 1.5, 2);
+  const core = adjustBrightness(color, 165);
+  const defs = [
+    `<clipPath id="ltClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`,
+  ];
+  const els = [];
+  const css = [];
 
   function boltPoints(r) {
     const edgeRoll = r();
     let ox, oy, dir, perp, span;
-    if (edgeRoll < 0.4) {       
-      ox = W * (0.08 + r() * 0.84); oy = -3;
-      dir = [0, 1]; perp = [1, 0]; span = H;
-    } else if (edgeRoll < 0.6) { 
-      ox = W * (0.08 + r() * 0.84); oy = H + 3;
-      dir = [0, -1]; perp = [1, 0]; span = H;
-    } else if (edgeRoll < 0.8) { 
-      ox = -3; oy = H * (0.15 + r() * 0.7);
-      dir = [1, 0]; perp = [0, 1]; span = W * 0.55;
-    } else {                     
-      ox = W + 3; oy = H * (0.15 + r() * 0.7);
-      dir = [-1, 0]; perp = [0, 1]; span = W * 0.55;
+    if (edgeRoll < 0.4) {
+      ox = W * (0.08 + r() * 0.84);
+      oy = -3;
+      dir = [0, 1];
+      perp = [1, 0];
+      span = H;
+    } else if (edgeRoll < 0.6) {
+      ox = W * (0.08 + r() * 0.84);
+      oy = H + 3;
+      dir = [0, -1];
+      perp = [1, 0];
+      span = H;
+    } else if (edgeRoll < 0.8) {
+      ox = -3;
+      oy = H * (0.15 + r() * 0.7);
+      dir = [1, 0];
+      perp = [0, 1];
+      span = W * 0.55;
+    } else {
+      ox = W + 3;
+      oy = H * (0.15 + r() * 0.7);
+      dir = [-1, 0];
+      perp = [0, 1];
+      span = W * 0.55;
     }
-    const segs  = 6 + Math.floor(r() * 3);          
-    const depth = span * (0.7 + r() * 0.28);        
-    const lean  = (r() - 0.5) * 2;                  
+    const segs = 6 + Math.floor(r() * 3);
+    const depth = span * (0.7 + r() * 0.28);
+    const lean = (r() - 0.5) * 2;
     const pts = [[round(ox, 1), round(oy, 1)]];
     let off = 0;
     for (let i = 1; i <= segs; i++) {
@@ -337,15 +436,16 @@ function buildLightning(cfg, W, H, br) {
   const toPoly = (pts) => pts.map((p) => `${p[0]},${p[1]}`).join(" ");
 
   for (let b = 0; b < bolts; b++) {
-    const r  = seededRand(211 + b * 53);
+    const r = seededRand(211 + b * 53);
     const { pts: main, dir, perp } = boltPoints(r);
 
     const fi = 2 + Math.floor(r() * (main.length - 4));
     const side = r() < 0.5 ? -1 : 1;
     const branch = [main[fi]];
-    let bx = main[fi][0], by = main[fi][1];
+    let bx = main[fi][0],
+      by = main[fi][1];
     for (let k = 1; k <= 3; k++) {
-      const sideStep  = side * jitter * (0.8 + r() * 1.2);
+      const sideStep = side * jitter * (0.8 + r() * 1.2);
       const alongStep = Math.min(W, H) * 0.08 * (0.6 + r() * 0.8);
       bx += perp[0] * sideStep + dir[0] * alongStep;
       by += perp[1] * sideStep + dir[1] * alongStep;
@@ -357,18 +457,18 @@ function buildLightning(cfg, W, H, br) {
       `<polyline points="${toPoly(pts)}" fill="none" stroke="${col}" stroke-width="${w}" stroke-opacity="${alpha}" stroke-linejoin="round" stroke-linecap="round"/>`;
 
     const g = `lt${b}`;
-    const delay = round(-(r() * cycle), 2); 
+    const delay = round(-(r() * cycle), 2);
     css.push(
       `@keyframes ${g}f{0%{opacity:0}3%{opacity:1}6%{opacity:.25}9%{opacity:1}14%{opacity:0}100%{opacity:0}}`,
-      `.${g}{animation:${g}f ${cycle}s ${delay}s steps(1,end) infinite}`
+      `.${g}{animation:${g}f ${cycle}s ${delay}s steps(1,end) infinite}`,
     );
 
     els.push(
       `<g class="${g}" opacity="0" clip-path="url(#ltClip)">` +
-      shape(main, sw * 3.2, color, round(o * 0.25, 3)) +   
-      shape(branch, sw * 0.7, color, round(o * 0.8, 3)) +  
-      shape(main, sw, core, round(o, 3)) +                 
-      `</g>`
+        shape(main, sw * 3.2, color, round(o * 0.25, 3)) +
+        shape(branch, sw * 0.7, color, round(o * 0.8, 3)) +
+        shape(main, sw, core, round(o, 3)) +
+        `</g>`,
     );
   }
 
@@ -376,22 +476,27 @@ function buildLightning(cfg, W, H, br) {
 }
 
 function buildSoundWaves(cfg, W, H, br) {
-  const color  = cfg.color     || "#38bdf8";
-  const o      = op(cfg.opacity ?? 45);
-  const speed  = clamp(Number(cfg.speed) || 4, 1, 10);
-  const count  = clamp(Math.round(cfg.count ?? 4), 1, 8);
-  const sw     = clamp(Number(cfg.strokeWidth) || 1.5, 0.5, 4);
+  const color = cfg.color || "#38bdf8";
+  const o = op(cfg.opacity ?? 45);
+  const speed = clamp(Number(cfg.speed) || 4, 1, 10);
+  const count = clamp(Math.round(cfg.count ?? 4), 1, 8);
+  const sw = clamp(Number(cfg.strokeWidth) || 1.5, 0.5, 4);
 
-  const dur  = round(14 / speed, 2);
-  const defs = [`<clipPath id="swClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`];
-  const els  = [];
+  const dur = round(14 / speed, 2);
+  const defs = [
+    `<clipPath id="swClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`,
+  ];
+  const els = [];
   const rand = seededRand(77);
 
   function wavePath(cy, amp, phase, cycles, steps = 48) {
     const pts = [];
     for (let i = 0; i <= steps; i++) {
       const x = round((i / steps) * W, 1);
-      const y = round(cy + amp * Math.sin((i / steps) * Math.PI * 2 * cycles + phase), 2);
+      const y = round(
+        cy + amp * Math.sin((i / steps) * Math.PI * 2 * cycles + phase),
+        2,
+      );
       pts.push(i === 0 ? `M ${x} ${y}` : `L ${x} ${y}`);
     }
     return pts.join(" ");
@@ -400,12 +505,12 @@ function buildSoundWaves(cfg, W, H, br) {
   els.push(`<g clip-path="url(#swClip)">`);
   for (let i = 0; i < count; i++) {
     const t = count <= 1 ? 0.5 : i / (count - 1);
-    const cy     = round(H * (0.22 + t * 0.56), 1);
-    const amp    = round(H * (0.05 + rand() * 0.05), 1);
+    const cy = round(H * (0.22 + t * 0.56), 1);
+    const amp = round(H * (0.05 + rand() * 0.05), 1);
     const cycles = round(1.5 + rand() * 1.5, 2);
-    const waveO  = round(o * (0.45 + (1 - t) * 0.55), 3);
+    const waveO = round(o * (0.45 + (1 - t) * 0.55), 3);
     const rowDur = round(dur * (0.8 + rand() * 0.5), 2);
-    const dirSign = i % 2 === 0 ? 1 : -1; 
+    const dirSign = i % 2 === 0 ? 1 : -1;
 
     const states = [0, 1, 2, 3, 4]
       .map((k) => wavePath(cy, amp, dirSign * k * (Math.PI / 2), cycles))
@@ -413,9 +518,9 @@ function buildSoundWaves(cfg, W, H, br) {
 
     els.push(
       `<path d="${wavePath(cy, amp, 0, cycles)}" fill="none" stroke="${color}" ` +
-      `stroke-width="${sw}" stroke-opacity="${waveO}" stroke-linecap="round">` +
-      `<animate attributeName="d" values="${states}" dur="${rowDur}s" begin="${round(-rand() * rowDur, 2)}s" repeatCount="indefinite" calcMode="linear"/>` +
-      `</path>`
+        `stroke-width="${sw}" stroke-opacity="${waveO}" stroke-linecap="round">` +
+        `<animate attributeName="d" values="${states}" dur="${rowDur}s" begin="${round(-rand() * rowDur, 2)}s" repeatCount="indefinite" calcMode="linear"/>` +
+        `</path>`,
     );
   }
   els.push(`</g>`);
@@ -424,34 +529,36 @@ function buildSoundWaves(cfg, W, H, br) {
 }
 
 function buildParticles(cfg, W, H, br) {
-  const color = cfg.color  || "#f472b6";
-  const o     = op(cfg.opacity ?? 70);
+  const color = cfg.color || "#f472b6";
+  const o = op(cfg.opacity ?? 70);
   const speed = clamp(Number(cfg.speed) || 3, 1, 10);
   const count = clamp(Math.round(cfg.count ?? 15), 3, 40);
-  const size  = clamp(Number(cfg.size) || 3, 1, 10);
+  const size = clamp(Number(cfg.size) || 3, 1, 10);
 
-  const rand    = seededRand(55);
+  const rand = seededRand(55);
   const baseDur = round(18 / speed, 2);
-  const defs = [`<clipPath id="ptClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`];
+  const defs = [
+    `<clipPath id="ptClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`,
+  ];
   const els = [`<g clip-path="url(#ptClip)">`];
 
   for (let i = 0; i < count; i++) {
-    const cx    = round(rand() * W, 1);
-    const cy    = round(H * (0.55 + rand() * 0.5), 1);   
-    const r     = round(size * (0.4 + rand() * 0.8), 1);
-    const dur   = round(baseDur * (0.55 + rand() * 0.75), 2);
-    const begin = round(-(rand() * dur), 2);              
-    const sway  = round((rand() - 0.5) * W * 0.18, 1);
+    const cx = round(rand() * W, 1);
+    const cy = round(H * (0.55 + rand() * 0.5), 1);
+    const r = round(size * (0.4 + rand() * 0.8), 1);
+    const dur = round(baseDur * (0.55 + rand() * 0.75), 2);
+    const begin = round(-(rand() * dur), 2);
+    const sway = round((rand() - 0.5) * W * 0.18, 1);
     const riseY = round(-(H * (0.75 + rand() * 0.45)), 1);
-    const pO    = round(o * (0.55 + rand() * 0.45), 3);
+    const pO = round(o * (0.55 + rand() * 0.45), 3);
 
     els.push(
       `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" opacity="0">` +
-      `<animateTransform attributeName="transform" type="translate" ` +
-      `values="0 0;${round(sway * 0.7, 1)} ${round(riseY * 0.5, 1)};${round(sway * 0.2, 1)} ${riseY}" ` +
-      `keyTimes="0;0.5;1" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="linear"/>` +
-      `<animate attributeName="opacity" values="0;${pO};${pO};0" keyTimes="0;0.12;0.65;1" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
-      `</circle>`
+        `<animateTransform attributeName="transform" type="translate" ` +
+        `values="0 0;${round(sway * 0.7, 1)} ${round(riseY * 0.5, 1)};${round(sway * 0.2, 1)} ${riseY}" ` +
+        `keyTimes="0;0.5;1" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="linear"/>` +
+        `<animate attributeName="opacity" values="0;${pO};${pO};0" keyTimes="0;0.12;0.65;1" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
+        `</circle>`,
     );
   }
   els.push(`</g>`);
@@ -460,113 +567,117 @@ function buildParticles(cfg, W, H, br) {
 }
 
 function buildScanlines(cfg, W, H, br) {
-  const color   = cfg.color      || "#ffffff";
-  const o       = op(cfg.opacity  ?? 18);
-  const speed   = clamp(Number(cfg.speed) || 3, 1, 10);
-  const lineGap = clamp(Math.round(cfg.lineGap   ?? 4), 2, 20);
-  const beamH   = clamp(Math.round(cfg.beamHeight ?? 36), 8, 100);
+  const color = cfg.color || "#ffffff";
+  const o = op(cfg.opacity ?? 18);
+  const speed = clamp(Number(cfg.speed) || 3, 1, 10);
+  const lineGap = clamp(Math.round(cfg.lineGap ?? 4), 2, 20);
+  const beamH = clamp(Math.round(cfg.beamHeight ?? 36), 8, 100);
 
-  const dur  = round(9 / speed, 2);
+  const dur = round(9 / speed, 2);
   const defs = [];
-  const els  = [];
+  const els = [];
 
   const gradId = "scBeamGrad";
   const clipId = "scClip";
   defs.push(
     `<linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">` +
-    `<stop offset="0%" stop-color="${color}" stop-opacity="0"/>` +
-    `<stop offset="45%" stop-color="${color}" stop-opacity="${round(o * 1.6, 3)}"/>` +
-    `<stop offset="55%" stop-color="${color}" stop-opacity="${round(o * 1.6, 3)}"/>` +
-    `<stop offset="100%" stop-color="${color}" stop-opacity="0"/>` +
-    `</linearGradient>`,
-    `<clipPath id="${clipId}"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`
+      `<stop offset="0%" stop-color="${color}" stop-opacity="0"/>` +
+      `<stop offset="45%" stop-color="${color}" stop-opacity="${round(o * 1.6, 3)}"/>` +
+      `<stop offset="55%" stop-color="${color}" stop-opacity="${round(o * 1.6, 3)}"/>` +
+      `<stop offset="100%" stop-color="${color}" stop-opacity="0"/>` +
+      `</linearGradient>`,
+    `<clipPath id="${clipId}"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`,
   );
 
   const lineEls = [];
   for (let y = lineGap; y < H; y += lineGap) {
-    lineEls.push(`<line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="${color}" stroke-width="0.5" stroke-opacity="${round(o * 0.45, 3)}"/>`);
+    lineEls.push(
+      `<line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="${color}" stroke-width="0.5" stroke-opacity="${round(o * 0.45, 3)}"/>`,
+    );
   }
 
   const travel = H + beamH * 2;
   els.push(
     `<g clip-path="url(#${clipId})">` +
-    `<g>${lineEls.join("")}</g>` +
-    `<rect x="0" y="${-beamH}" width="${W}" height="${beamH}" fill="url(#${gradId})">` +
-    `<animateTransform attributeName="transform" type="translate" from="0 0" to="0 ${travel}" dur="${dur}s" begin="${round(-dur * 0.45, 2)}s" repeatCount="indefinite"/>` +
-    `</rect>` +
-    `</g>`
+      `<g>${lineEls.join("")}</g>` +
+      `<rect x="0" y="${-beamH}" width="${W}" height="${beamH}" fill="url(#${gradId})">` +
+      `<animateTransform attributeName="transform" type="translate" from="0 0" to="0 ${travel}" dur="${dur}s" begin="${round(-dur * 0.45, 2)}s" repeatCount="indefinite"/>` +
+      `</rect>` +
+      `</g>`,
   );
 
   return { defs, els, css: "" };
 }
 
 function buildShimmer(cfg, W, H, br) {
-  const color = cfg.color      || "#ffffff";
-  const o     = op(cfg.opacity  ?? 55);
+  const color = cfg.color || "#ffffff";
+  const o = op(cfg.opacity ?? 55);
   const speed = clamp(Number(cfg.speed) || 3, 1, 10);
   const beamW = clamp(Math.round(cfg.beamWidth ?? 100), 20, 300);
 
   const period = round(16 / speed, 2);
   const defs = [];
-  const els  = [];
+  const els = [];
 
   const gradId = "shimGrad";
   const clipId = "shimClip";
   defs.push(
     `<linearGradient id="${gradId}" x1="0" y1="0" x2="1" y2="0">` +
-    `<stop offset="0%"   stop-color="${color}" stop-opacity="0"/>` +
-    `<stop offset="38%"  stop-color="${color}" stop-opacity="${round(o * 0.45, 3)}"/>` +
-    `<stop offset="50%"  stop-color="${color}" stop-opacity="${round(o, 3)}"/>` +
-    `<stop offset="62%"  stop-color="${color}" stop-opacity="${round(o * 0.45, 3)}"/>` +
-    `<stop offset="100%" stop-color="${color}" stop-opacity="0"/>` +
-    `</linearGradient>`,
-    `<clipPath id="${clipId}"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`
+      `<stop offset="0%"   stop-color="${color}" stop-opacity="0"/>` +
+      `<stop offset="38%"  stop-color="${color}" stop-opacity="${round(o * 0.45, 3)}"/>` +
+      `<stop offset="50%"  stop-color="${color}" stop-opacity="${round(o, 3)}"/>` +
+      `<stop offset="62%"  stop-color="${color}" stop-opacity="${round(o * 0.45, 3)}"/>` +
+      `<stop offset="100%" stop-color="${color}" stop-opacity="0"/>` +
+      `</linearGradient>`,
+    `<clipPath id="${clipId}"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`,
   );
 
-  const skewRad = 20 * Math.PI / 180;
-  const extraX  = Math.round(H * Math.tan(skewRad));
-  const startX  = -(beamW + extraX);
-  const travel  = W + beamW + extraX * 2;
+  const skewRad = (20 * Math.PI) / 180;
+  const extraX = Math.round(H * Math.tan(skewRad));
+  const startX = -(beamW + extraX);
+  const travel = W + beamW + extraX * 2;
 
   els.push(
     `<g clip-path="url(#${clipId})">` +
-    `<g transform="skewX(-20)">` +
-    `<rect x="${startX}" y="0" width="${beamW}" height="${H}" fill="url(#${gradId})">` +
-    `<animateTransform attributeName="transform" type="translate" ` +
-    `values="0 0;${travel} 0;${travel} 0" keyTimes="0;0.4;1" ` +
-    `dur="${period}s" begin="${round(-period * 0.15, 2)}s" repeatCount="indefinite" ` +
-    `calcMode="spline" keySplines="0.35 0 0.65 1;0 0 1 1"/>` +
-    `</rect>` +
-    `</g>` +
-    `</g>`
+      `<g transform="skewX(-20)">` +
+      `<rect x="${startX}" y="0" width="${beamW}" height="${H}" fill="url(#${gradId})">` +
+      `<animateTransform attributeName="transform" type="translate" ` +
+      `values="0 0;${travel} 0;${travel} 0" keyTimes="0;0.4;1" ` +
+      `dur="${period}s" begin="${round(-period * 0.15, 2)}s" repeatCount="indefinite" ` +
+      `calcMode="spline" keySplines="0.35 0 0.65 1;0 0 1 1"/>` +
+      `</rect>` +
+      `</g>` +
+      `</g>`,
   );
 
   return { defs, els, css: "" };
 }
 
 function buildPulseRings(cfg, W, H, br) {
-  const color = cfg.color  || "#818cf8";
-  const o     = op(cfg.opacity ?? 60);
+  const color = cfg.color || "#818cf8";
+  const o = op(cfg.opacity ?? 60);
   const speed = clamp(Number(cfg.speed) || 3, 1, 10);
   const count = clamp(Math.round(cfg.count ?? 3), 1, 8);
-  const sw    = clamp(Number(cfg.strokeWidth) || 1.5, 0.5, 4);
+  const sw = clamp(Number(cfg.strokeWidth) || 1.5, 0.5, 4);
 
-  const dur   = round(10 / speed, 2);
-  const cx    = round(W / 2, 1);
-  const cy    = round(H / 2, 1);
+  const dur = round(10 / speed, 2);
+  const cx = round(W / 2, 1);
+  const cy = round(H / 2, 1);
   const maxRx = round(W / 2 + sw * 2, 1);
   const maxRy = round(H / 2 + sw * 2, 1);
-  const defs  = [`<clipPath id="prClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`];
-  const els   = [`<g clip-path="url(#prClip)">`];
+  const defs = [
+    `<clipPath id="prClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`,
+  ];
+  const els = [`<g clip-path="url(#prClip)">`];
 
   for (let i = 0; i < count; i++) {
-    const begin = round(-(i / count) * dur, 2); 
+    const begin = round(-(i / count) * dur, 2);
     els.push(
       `<ellipse cx="${cx}" cy="${cy}" rx="2" ry="2" fill="none" stroke="${color}" stroke-width="${sw}" stroke-opacity="0">` +
-      `<animate attributeName="rx" values="2;${maxRx}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="spline" keySplines="0.25 0 0.65 1"/>` +
-      `<animate attributeName="ry" values="2;${maxRy}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="spline" keySplines="0.25 0 0.65 1"/>` +
-      `<animate attributeName="stroke-opacity" values="0;${round(o, 3)};${round(o * 0.6, 3)};0" keyTimes="0;0.08;0.55;1" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
-      `</ellipse>`
+        `<animate attributeName="rx" values="2;${maxRx}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="spline" keySplines="0.25 0 0.65 1"/>` +
+        `<animate attributeName="ry" values="2;${maxRy}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="spline" keySplines="0.25 0 0.65 1"/>` +
+        `<animate attributeName="stroke-opacity" values="0;${round(o, 3)};${round(o * 0.6, 3)};0" keyTimes="0;0.08;0.55;1" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
+        `</ellipse>`,
     );
   }
   els.push(`</g>`);
@@ -575,39 +686,41 @@ function buildPulseRings(cfg, W, H, br) {
 }
 
 function buildMatrixRain(cfg, W, H, br) {
-  const color   = cfg.color    || "#4ade80";
-  const o       = op(cfg.opacity ?? 55);
-  const speed   = clamp(Number(cfg.speed) || 5, 1, 10);
+  const color = cfg.color || "#4ade80";
+  const o = op(cfg.opacity ?? 55);
+  const speed = clamp(Number(cfg.speed) || 5, 1, 10);
   const columns = clamp(Math.round(cfg.columns ?? 12), 3, 30);
   const dotSize = clamp(Number(cfg.dotSize) || 3, 1, 8);
 
-  const rand    = seededRand(13);
+  const rand = seededRand(13);
   const baseDur = round(14 / speed, 2);
-  const head    = adjustBrightness(color, 150);
-  const defs    = [`<clipPath id="mrClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`];
-  const els     = [`<g clip-path="url(#mrClip)">`];
+  const head = adjustBrightness(color, 150);
+  const defs = [
+    `<clipPath id="mrClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`,
+  ];
+  const els = [`<g clip-path="url(#mrClip)">`];
 
   for (let i = 0; i < columns; i++) {
-    const cellW  = W / columns;
-    const cx     = round((i + 0.2 + rand() * 0.6) * cellW, 1); 
-    const colH   = round(H * (0.35 + rand() * 0.55), 1);
-    const dur    = round(baseDur * (0.55 + rand() * 0.7), 2);
-    const begin  = round(-(rand() * dur), 2);                  
-    const colO   = round(o * (0.45 + rand() * 0.55), 3);
-    const dashOn  = round(dotSize * 0.9, 1);
+    const cellW = W / columns;
+    const cx = round((i + 0.2 + rand() * 0.6) * cellW, 1);
+    const colH = round(H * (0.35 + rand() * 0.55), 1);
+    const dur = round(baseDur * (0.55 + rand() * 0.7), 2);
+    const begin = round(-(rand() * dur), 2);
+    const colO = round(o * (0.45 + rand() * 0.55), 3);
+    const dashOn = round(dotSize * 0.9, 1);
     const dashOff = round(dotSize * 1.4, 1);
-    const startY  = -colH;
-    const travel  = round(H + colH, 1);
+    const startY = -colH;
+    const travel = round(H + colH, 1);
 
     els.push(
       `<line x1="${cx}" y1="${startY}" x2="${cx}" y2="0" ` +
-      `stroke="${color}" stroke-width="${round(dotSize * 0.5, 1)}" stroke-opacity="${colO}" ` +
-      `stroke-dasharray="${dashOn} ${dashOff}" stroke-linecap="round">` +
-      `<animateTransform attributeName="transform" type="translate" from="0 0" to="0 ${travel}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
-      `</line>` +
-      `<circle cx="${cx}" cy="0" r="${round(dotSize * 0.6, 1)}" fill="${head}" fill-opacity="${round(Math.min(1, colO * 1.9), 3)}">` +
-      `<animateTransform attributeName="transform" type="translate" from="0 0" to="0 ${travel}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
-      `</circle>`
+        `stroke="${color}" stroke-width="${round(dotSize * 0.5, 1)}" stroke-opacity="${colO}" ` +
+        `stroke-dasharray="${dashOn} ${dashOff}" stroke-linecap="round">` +
+        `<animateTransform attributeName="transform" type="translate" from="0 0" to="0 ${travel}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
+        `</line>` +
+        `<circle cx="${cx}" cy="0" r="${round(dotSize * 0.6, 1)}" fill="${head}" fill-opacity="${round(Math.min(1, colO * 1.9), 3)}">` +
+        `<animateTransform attributeName="transform" type="translate" from="0 0" to="0 ${travel}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
+        `</circle>`,
     );
   }
   els.push(`</g>`);
@@ -617,22 +730,25 @@ function buildMatrixRain(cfg, W, H, br) {
 
 function buildBorderBeam(cfg, W, H, br) {
   const color = cfg.color || "#38bdf8";
-  const o     = op(cfg.opacity ?? 90);
+  const o = op(cfg.opacity ?? 90);
   const speed = clamp(Number(cfg.speed) || 4, 1, 10);
   const count = clamp(Math.round(cfg.count ?? 1), 1, 4);
   const thick = clamp(Number(cfg.thickness) || 3, 1, 8);
 
-  const seg   = 100 / count;
-  const tail  = Math.min(clamp(Number(cfg.tailLength) || 18, 5, 40), round(seg * 0.8, 2));
+  const seg = 100 / count;
+  const tail = Math.min(
+    clamp(Number(cfg.tailLength) || 18, 5, 40),
+    round(seg * 0.8, 2),
+  );
 
-  const dur   = round(24 / speed, 2);
-  const head  = adjustBrightness(color, 165);
+  const dur = round(24 / speed, 2);
+  const head = adjustBrightness(color, 165);
   const inset = thick / 2 + 0.5;
-  const rx    = Math.max(0, br - inset);
+  const rx = Math.max(0, br - inset);
   const rectAttrs = `x="${round(inset, 1)}" y="${round(inset, 1)}" width="${round(W - inset * 2, 1)}" height="${round(H - inset * 2, 1)}" rx="${round(rx, 1)}" fill="none" pathLength="100" stroke-linecap="round"`;
 
   const layer = (len, w, col, alpha) => {
-    const on    = round(Math.min(len, seg * 0.9), 2);
+    const on = round(Math.min(len, seg * 0.9), 2);
     const shift = round(on - tail, 2);
     return (
       `<rect ${rectAttrs} stroke="${col}" stroke-width="${round(w, 2)}" stroke-opacity="${round(alpha, 3)}" ` +
@@ -642,14 +758,16 @@ function buildBorderBeam(cfg, W, H, br) {
     );
   };
 
-  const defs = [`<clipPath id="bbClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`];
+  const defs = [
+    `<clipPath id="bbClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`,
+  ];
   const els = [
     `<g clip-path="url(#bbClip)">`,
-    layer(tail,        thick * 2.4, color, o * 0.16),   
-    layer(tail,        thick,       color, o * 0.22),   
-    layer(tail * 0.62, thick,       color, o * 0.4),    
-    layer(tail * 0.34, thick,       color, o * 0.65),   
-    layer(tail * 0.14, thick,       head,  o),          
+    layer(tail, thick * 2.4, color, o * 0.16),
+    layer(tail, thick, color, o * 0.22),
+    layer(tail * 0.62, thick, color, o * 0.4),
+    layer(tail * 0.34, thick, color, o * 0.65),
+    layer(tail * 0.14, thick, head, o),
     `</g>`,
   ];
 
@@ -658,15 +776,17 @@ function buildBorderBeam(cfg, W, H, br) {
 
 function buildSparkles(cfg, W, H, br) {
   const color = cfg.color || "#fde047";
-  const o     = op(cfg.opacity ?? 85);
+  const o = op(cfg.opacity ?? 85);
   const speed = clamp(Number(cfg.speed) || 4, 1, 10);
   const count = clamp(Math.round(cfg.count ?? 10), 3, 30);
-  const size  = clamp(Number(cfg.size) || 5, 2, 12);
+  const size = clamp(Number(cfg.size) || 5, 2, 12);
 
-  const rand    = seededRand(313);
+  const rand = seededRand(313);
   const baseDur = round(9 / speed, 2);
-  const defs = [`<clipPath id="spClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`];
-  const els  = [`<g clip-path="url(#spClip)">`];
+  const defs = [
+    `<clipPath id="spClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`,
+  ];
+  const els = [`<g clip-path="url(#spClip)">`];
 
   const starPath = (s) => {
     const q = round(s * 0.18, 2);
@@ -674,21 +794,21 @@ function buildSparkles(cfg, W, H, br) {
   };
 
   for (let i = 0; i < count; i++) {
-    const x     = round(W * (0.04 + rand() * 0.92), 1);
-    const y     = round(H * (0.1 + rand() * 0.8), 1);
-    const s     = round(size * (0.5 + rand() * 0.8), 2);
-    const dur   = round(baseDur * (0.6 + rand() * 0.9), 2);
+    const x = round(W * (0.04 + rand() * 0.92), 1);
+    const y = round(H * (0.1 + rand() * 0.8), 1);
+    const s = round(size * (0.5 + rand() * 0.8), 2);
+    const dur = round(baseDur * (0.6 + rand() * 0.9), 2);
     const begin = round(-(rand() * dur), 2);
-    const pO    = round(o * (0.6 + rand() * 0.4), 3);
-    const rot   = Math.round(rand() * 90);
+    const pO = round(o * (0.6 + rand() * 0.4), 3);
+    const rot = Math.round(rand() * 90);
 
     els.push(
       `<g transform="translate(${x} ${y}) rotate(${rot})">` +
-      `<path d="${starPath(s)}" fill="${color}" opacity="0">` +
-      `<animateTransform attributeName="transform" type="scale" values="0.25;1;0.25" keyTimes="0;0.5;1" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>` +
-      `<animate attributeName="opacity" values="0;${pO};0" keyTimes="0;0.5;1" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
-      `</path>` +
-      `</g>`
+        `<path d="${starPath(s)}" fill="${color}" opacity="0">` +
+        `<animateTransform attributeName="transform" type="scale" values="0.25;1;0.25" keyTimes="0;0.5;1" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>` +
+        `<animate attributeName="opacity" values="0;${pO};0" keyTimes="0;0.5;1" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
+        `</path>` +
+        `</g>`,
     );
   }
   els.push(`</g>`);
@@ -698,39 +818,46 @@ function buildSparkles(cfg, W, H, br) {
 
 function buildConfetti(cfg, W, H, br) {
   const color = cfg.color || "#f472b6";
-  const o     = op(cfg.opacity ?? 90);
+  const o = op(cfg.opacity ?? 90);
   const speed = clamp(Number(cfg.speed) || 4, 1, 10);
   const count = clamp(Math.round(cfg.count ?? 18), 5, 40);
-  const size  = clamp(Number(cfg.size) || 5, 2, 10);
+  const size = clamp(Number(cfg.size) || 5, 2, 10);
 
-  const rand    = seededRand(97);
+  const rand = seededRand(97);
   const baseDur = round(16 / speed, 2);
-  const palette = [color, hueShift(color, 45), hueShift(color, -45), hueShift(color, 160)];
-  const defs = [`<clipPath id="cfClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`];
-  const els  = [`<g clip-path="url(#cfClip)">`];
+  const palette = [
+    color,
+    hueShift(color, 45),
+    hueShift(color, -45),
+    hueShift(color, 160),
+  ];
+  const defs = [
+    `<clipPath id="cfClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`,
+  ];
+  const els = [`<g clip-path="url(#cfClip)">`];
 
   for (let i = 0; i < count; i++) {
-    const x     = round(W * rand(), 1);
-    const w     = round(size * (0.6 + rand() * 0.7), 1);
-    const h     = round(w * (0.4 + rand() * 0.3), 1);
-    const col   = palette[Math.floor(rand() * palette.length)];
-    const dur   = round(baseDur * (0.55 + rand() * 0.8), 2);
+    const x = round(W * rand(), 1);
+    const w = round(size * (0.6 + rand() * 0.7), 1);
+    const h = round(w * (0.4 + rand() * 0.3), 1);
+    const col = palette[Math.floor(rand() * palette.length)];
+    const dur = round(baseDur * (0.55 + rand() * 0.8), 2);
     const begin = round(-(rand() * dur), 2);
-    const sway  = round((rand() - 0.5) * W * 0.15, 1);
-    const drop  = round(H + size * 4, 1);
-    const y0    = round(-size * 2, 1);
-    const spin  = round(240 + rand() * 480, 0) * (rand() < 0.5 ? -1 : 1);
-    const pO    = round(o * (0.7 + rand() * 0.3), 3);
+    const sway = round((rand() - 0.5) * W * 0.15, 1);
+    const drop = round(H + size * 4, 1);
+    const y0 = round(-size * 2, 1);
+    const spin = round(240 + rand() * 480, 0) * (rand() < 0.5 ? -1 : 1);
+    const pO = round(o * (0.7 + rand() * 0.3), 3);
 
     els.push(
       `<g transform="translate(${x} ${y0})">` +
-      `<g>` +
-      `<animateTransform attributeName="transform" type="translate" values="0 0;${sway} ${round(drop * 0.5, 1)};0 ${drop}" keyTimes="0;0.5;1" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="linear"/>` +
-      `<rect x="${round(-w / 2, 1)}" y="${round(-h / 2, 1)}" width="${w}" height="${h}" rx="${round(h * 0.2, 1)}" fill="${col}" fill-opacity="${pO}">` +
-      `<animateTransform attributeName="transform" type="rotate" from="0 0 0" to="${spin} 0 0" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
-      `</rect>` +
-      `</g>` +
-      `</g>`
+        `<g>` +
+        `<animateTransform attributeName="transform" type="translate" values="0 0;${sway} ${round(drop * 0.5, 1)};0 ${drop}" keyTimes="0;0.5;1" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="linear"/>` +
+        `<rect x="${round(-w / 2, 1)}" y="${round(-h / 2, 1)}" width="${w}" height="${h}" rx="${round(h * 0.2, 1)}" fill="${col}" fill-opacity="${pO}">` +
+        `<animateTransform attributeName="transform" type="rotate" from="0 0 0" to="${spin} 0 0" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
+        `</rect>` +
+        `</g>` +
+        `</g>`,
     );
   }
   els.push(`</g>`);
@@ -740,15 +867,20 @@ function buildConfetti(cfg, W, H, br) {
 
 function buildAurora(cfg, W, H, br) {
   const color = cfg.color || "#22d3ee";
-  const o     = op(cfg.opacity ?? 45);
+  const o = op(cfg.opacity ?? 45);
   const speed = clamp(Number(cfg.speed) || 2, 1, 10);
   const blobs = clamp(Math.round(cfg.blobs ?? 3), 1, 4);
-  const size  = clamp(Number(cfg.size) || 60, 30, 120);   
+  const size = clamp(Number(cfg.size) || 60, 30, 120);
 
-  const rand    = seededRand(41);
+  const rand = seededRand(41);
   const baseDur = round(40 / speed, 2);
-  const blur    = round(Math.max(6, H * 0.12), 1);
-  const shades  = [color, hueShift(color, 60), hueShift(color, -60), hueShift(color, 120)];
+  const blur = round(Math.max(6, H * 0.12), 1);
+  const shades = [
+    color,
+    hueShift(color, 60),
+    hueShift(color, -60),
+    hueShift(color, 120),
+  ];
   const defs = [
     `<filter id="auBlur" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="${blur}"/></filter>`,
     `<clipPath id="auClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`,
@@ -756,22 +888,22 @@ function buildAurora(cfg, W, H, br) {
   const els = [`<g clip-path="url(#auClip)">`];
 
   for (let i = 0; i < blobs; i++) {
-    const col   = shades[i % shades.length];
-    const cx    = round(W * ((i + 0.5) / blobs + (rand() - 0.5) * 0.15), 1);
-    const cy    = round(H * (0.35 + rand() * 0.35), 1);
-    const ry    = round(H * (size / 100) * (0.45 + rand() * 0.25), 1);
-    const rx    = round(ry * (1.6 + rand() * 0.9), 1);
-    const dur   = round(baseDur * (0.7 + rand() * 0.6), 2);
+    const col = shades[i % shades.length];
+    const cx = round(W * ((i + 0.5) / blobs + (rand() - 0.5) * 0.15), 1);
+    const cy = round(H * (0.35 + rand() * 0.35), 1);
+    const ry = round(H * (size / 100) * (0.45 + rand() * 0.25), 1);
+    const rx = round(ry * (1.6 + rand() * 0.9), 1);
+    const dur = round(baseDur * (0.7 + rand() * 0.6), 2);
     const begin = round(-(rand() * dur), 2);
-    const dx    = round(W * (0.1 + rand() * 0.12) * (i % 2 === 0 ? 1 : -1), 1);
-    const dy    = round(H * 0.08 * (rand() < 0.5 ? 1 : -1), 1);
-    const pO    = round(o * (0.55 + rand() * 0.45), 3);
+    const dx = round(W * (0.1 + rand() * 0.12) * (i % 2 === 0 ? 1 : -1), 1);
+    const dy = round(H * 0.08 * (rand() < 0.5 ? 1 : -1), 1);
+    const pO = round(o * (0.55 + rand() * 0.45), 3);
 
     els.push(
       `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${col}" opacity="0" filter="url(#auBlur)">` +
-      `<animateTransform attributeName="transform" type="translate" values="0 0;${dx} ${dy};0 0" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>` +
-      `<animate attributeName="opacity" values="${round(pO * 0.55, 3)};${pO};${round(pO * 0.55, 3)}" dur="${round(dur * 0.5, 2)}s" begin="${begin}s" repeatCount="indefinite"/>` +
-      `</ellipse>`
+        `<animateTransform attributeName="transform" type="translate" values="0 0;${dx} ${dy};0 0" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>` +
+        `<animate attributeName="opacity" values="${round(pO * 0.55, 3)};${pO};${round(pO * 0.55, 3)}" dur="${round(dur * 0.5, 2)}s" begin="${begin}s" repeatCount="indefinite"/>` +
+        `</ellipse>`,
     );
   }
   els.push(`</g>`);
@@ -781,37 +913,39 @@ function buildAurora(cfg, W, H, br) {
 
 function buildBlurrylights(cfg, W, H, br) {
   const color = cfg.color || "#fbbf24";
-  const o     = op(cfg.opacity ?? 45);
+  const o = op(cfg.opacity ?? 45);
   const speed = clamp(Number(cfg.speed) || 2, 1, 10);
   const count = clamp(Math.round(cfg.count ?? 10), 3, 25);
-  const size  = clamp(Number(cfg.size) || 10, 4, 24);
+  const size = clamp(Number(cfg.size) || 10, 4, 24);
 
-  const rand    = seededRand(929);
+  const rand = seededRand(929);
   const baseDur = round(30 / speed, 2);
-  const blurs   = [round(H * 0.015, 1), round(H * 0.04, 1), round(H * 0.08, 1)];
+  const blurs = [round(H * 0.015, 1), round(H * 0.04, 1), round(H * 0.08, 1)];
   const defs = [
     `<clipPath id="bkClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`,
-    ...blurs.map((b, i) =>
-      `<filter id="bkBlur${i}" x="-120%" y="-120%" width="340%" height="340%"><feGaussianBlur stdDeviation="${b}"/></filter>`),
+    ...blurs.map(
+      (b, i) =>
+        `<filter id="bkBlur${i}" x="-120%" y="-120%" width="340%" height="340%"><feGaussianBlur stdDeviation="${b}"/></filter>`,
+    ),
   ];
   const els = [`<g clip-path="url(#bkClip)">`];
 
   for (let i = 0; i < count; i++) {
-    const depth = i % 3;                                   
-    const x     = round(W * (0.04 + rand() * 0.92), 1);
-    const y     = round(H * (0.35 + rand() * 0.6), 1);
-    const r     = round(size * (0.5 + rand() * 1.1) * (1 + depth * 0.45), 1);
-    const dy    = round(-H * (0.25 + rand() * 0.3), 1);
-    const dx    = round(W * (rand() - 0.5) * 0.06, 1);
-    const dur   = round(baseDur * (0.7 + rand() * 0.7), 2);
+    const depth = i % 3;
+    const x = round(W * (0.04 + rand() * 0.92), 1);
+    const y = round(H * (0.35 + rand() * 0.6), 1);
+    const r = round(size * (0.5 + rand() * 1.1) * (1 + depth * 0.45), 1);
+    const dy = round(-H * (0.25 + rand() * 0.3), 1);
+    const dx = round(W * (rand() - 0.5) * 0.06, 1);
+    const dur = round(baseDur * (0.7 + rand() * 0.7), 2);
     const begin = round(-(rand() * dur), 2);
-    const pO    = round(o * (0.45 + rand() * 0.55) * (1 - depth * 0.18), 3);
+    const pO = round(o * (0.45 + rand() * 0.55) * (1 - depth * 0.18), 3);
 
     els.push(
       `<circle cx="${x}" cy="${y}" r="${r}" fill="${color}" opacity="0" filter="url(#bkBlur${depth})">` +
-      `<animateTransform attributeName="transform" type="translate" values="0 0;${dx} ${dy}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
-      `<animate attributeName="opacity" values="0;${pO};${pO};0" keyTimes="0;0.2;0.75;1" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
-      `</circle>`
+        `<animateTransform attributeName="transform" type="translate" values="0 0;${dx} ${dy}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
+        `<animate attributeName="opacity" values="0;${pO};${pO};0" keyTimes="0;0.2;0.75;1" dur="${dur}s" begin="${begin}s" repeatCount="indefinite"/>` +
+        `</circle>`,
     );
   }
   els.push(`</g>`);
@@ -821,21 +955,21 @@ function buildBlurrylights(cfg, W, H, br) {
 
 function buildSynthGrid(cfg, W, H, br) {
   const color = cfg.color || "#ff2d95";
-  const o     = op(cfg.opacity ?? 55);
+  const o = op(cfg.opacity ?? 55);
   const speed = clamp(Number(cfg.speed) || 4, 1, 10);
-  const cols  = clamp(Math.round(cfg.columns ?? 7), 3, 12);   
-  const rows  = clamp(Math.round(cfg.rows ?? 5), 2, 8);
+  const cols = clamp(Math.round(cfg.columns ?? 7), 3, 12);
+  const rows = clamp(Math.round(cfg.rows ?? 5), 2, 8);
 
-  const yH   = round(H * 0.52, 1);        
-  const cx   = round(W / 2, 1);
-  const dur  = round(10 / speed, 2);
+  const yH = round(H * 0.52, 1);
+  const cx = round(W / 2, 1);
+  const dur = round(10 / speed, 2);
   const defs = [
     `<clipPath id="sgClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`,
     `<linearGradient id="sgFade" gradientUnits="userSpaceOnUse" x1="0" y1="${yH}" x2="0" y2="${H}">` +
-    `<stop offset="0" stop-color="${color}" stop-opacity="0"/>` +
-    `<stop offset="0.25" stop-color="${color}" stop-opacity="${round(o * 0.55, 3)}"/>` +
-    `<stop offset="1" stop-color="${color}" stop-opacity="${round(o, 3)}"/>` +
-    `</linearGradient>`,
+      `<stop offset="0" stop-color="${color}" stop-opacity="0"/>` +
+      `<stop offset="0.25" stop-color="${color}" stop-opacity="${round(o * 0.55, 3)}"/>` +
+      `<stop offset="1" stop-color="${color}" stop-opacity="${round(o, 3)}"/>` +
+      `</linearGradient>`,
   ];
   const els = [`<g clip-path="url(#sgClip)">`];
 
@@ -843,9 +977,13 @@ function buildSynthGrid(cfg, W, H, br) {
   for (let i = -cols; i <= cols; i++) {
     if (i === 0) continue;
     const bx = round(cx + i * spread, 1);
-    els.push(`<line x1="${cx}" y1="${yH}" x2="${bx}" y2="${H}" stroke="url(#sgFade)" stroke-width="1"/>`);
+    els.push(
+      `<line x1="${cx}" y1="${yH}" x2="${bx}" y2="${H}" stroke="url(#sgFade)" stroke-width="1"/>`,
+    );
   }
-  els.push(`<line x1="0" y1="${yH}" x2="${W}" y2="${yH}" stroke="${color}" stroke-opacity="${round(o * 0.5, 3)}" stroke-width="1.5"/>`);
+  els.push(
+    `<line x1="0" y1="${yH}" x2="${W}" y2="${yH}" stroke="${color}" stroke-opacity="${round(o * 0.5, 3)}" stroke-width="1.5"/>`,
+  );
 
   const samples = 13;
   const ys = [];
@@ -858,9 +996,9 @@ function buildSynthGrid(cfg, W, H, br) {
     const begin = round(-(rI / rows) * dur, 2);
     els.push(
       `<line x1="0" y1="${yH}" x2="${W}" y2="${yH}" stroke="url(#sgFade)" stroke-width="1.4">` +
-      `<animate attributeName="y1" values="${vals}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="linear"/>` +
-      `<animate attributeName="y2" values="${vals}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="linear"/>` +
-      `</line>`
+        `<animate attributeName="y1" values="${vals}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="linear"/>` +
+        `<animate attributeName="y2" values="${vals}" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="linear"/>` +
+        `</line>`,
     );
   }
   els.push(`</g>`);
@@ -869,38 +1007,41 @@ function buildSynthGrid(cfg, W, H, br) {
 }
 
 function buildStarfield(cfg, W, H, br) {
-  const color  = cfg.color || "#dbeafe";
-  const o      = op(cfg.opacity ?? 70);
-  const speed  = clamp(Number(cfg.speed) || 5, 1, 10);
-  const count  = clamp(Math.round(cfg.count ?? 18), 6, 40);
-  const streak = clamp(Number(cfg.streak) || 14, 5, 30);   
+  const color = cfg.color || "#dbeafe";
+  const o = op(cfg.opacity ?? 70);
+  const speed = clamp(Number(cfg.speed) || 5, 1, 10);
+  const count = clamp(Math.round(cfg.count ?? 18), 6, 40);
+  const streak = clamp(Number(cfg.streak) || 14, 5, 30);
 
-  const rand    = seededRand(1201);
+  const rand = seededRand(1201);
   const baseDur = round(7 / speed, 2);
-  const cx = round(W / 2, 1), cy = round(H / 2, 1);
-  const R  = Math.hypot(W / 2, H / 2) * 1.02;
-  const defs = [`<clipPath id="stClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`];
-  const els  = [`<g clip-path="url(#stClip)">`];
+  const cx = round(W / 2, 1),
+    cy = round(H / 2, 1);
+  const R = Math.hypot(W / 2, H / 2) * 1.02;
+  const defs = [
+    `<clipPath id="stClip"><rect width="${W}" height="${H}" rx="${br}"/></clipPath>`,
+  ];
+  const els = [`<g clip-path="url(#stClip)">`];
 
   for (let i = 0; i < count; i++) {
     const ang = (i / count) * Math.PI * 2 + rand() * 0.5;
-    const r0  = R * (0.04 + rand() * 0.06);
-    const x1  = round(cx + Math.cos(ang) * r0, 1);
-    const y1  = round(cy + Math.sin(ang) * r0, 1);
-    const x2  = round(cx + Math.cos(ang) * R, 1);
-    const y2  = round(cy + Math.sin(ang) * R, 1);
-    const on  = round(streak * (0.7 + rand() * 0.6), 2);
+    const r0 = R * (0.04 + rand() * 0.06);
+    const x1 = round(cx + Math.cos(ang) * r0, 1);
+    const y1 = round(cy + Math.sin(ang) * r0, 1);
+    const x2 = round(cx + Math.cos(ang) * R, 1);
+    const y2 = round(cy + Math.sin(ang) * R, 1);
+    const on = round(streak * (0.7 + rand() * 0.6), 2);
     const dur = round(baseDur * (0.6 + rand() * 0.9), 2);
     const begin = round(-(rand() * dur), 2);
-    const sw  = round(0.8 + rand() * 1.4, 2);
-    const pO  = round(o * (0.5 + rand() * 0.5), 3);
+    const sw = round(0.8 + rand() * 1.4, 2);
+    const pO = round(o * (0.5 + rand() * 0.5), 3);
 
     els.push(
       `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" pathLength="100" fill="none" ` +
-      `stroke="${color}" stroke-width="${sw}" stroke-opacity="${pO}" stroke-linecap="round" ` +
-      `stroke-dasharray="${on} ${round(100 - on, 2)}" stroke-dashoffset="${on}">` +
-      `<animate attributeName="stroke-dashoffset" values="${on};-100" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="spline" keySplines="0.55 0 0.9 0.6"/>` +
-      `</line>`
+        `stroke="${color}" stroke-width="${sw}" stroke-opacity="${pO}" stroke-linecap="round" ` +
+        `stroke-dasharray="${on} ${round(100 - on, 2)}" stroke-dashoffset="${on}">` +
+        `<animate attributeName="stroke-dashoffset" values="${on};-100" dur="${dur}s" begin="${begin}s" repeatCount="indefinite" calcMode="spline" keySplines="0.55 0 0.9 0.6"/>` +
+        `</line>`,
     );
   }
   els.push(`</g>`);
@@ -909,61 +1050,97 @@ function buildStarfield(cfg, W, H, br) {
 }
 
 function buildVignette(cfg, W, H, br) {
-  const color   = cfg.color || "#000000";
-  const o       = op(cfg.opacity ?? 60);
-  const speed   = clamp(Number(cfg.speed) || 5, 1, 10);
+  const color = cfg.color || "#000000";
+  const o = op(cfg.opacity ?? 60);
+  const speed = clamp(Number(cfg.speed) || 5, 1, 10);
   const flicker = clamp(Number(cfg.flicker ?? 25), 0, 100) / 100;
 
   const defs = [
     `<radialGradient id="vgGrad" cx="50%" cy="50%" r="72%">` +
-    `<stop offset="0" stop-color="${color}" stop-opacity="0"/>` +
-    `<stop offset="0.55" stop-color="${color}" stop-opacity="0"/>` +
-    `<stop offset="1" stop-color="${color}" stop-opacity="${round(o, 3)}"/>` +
-    `</radialGradient>`,
+      `<stop offset="0" stop-color="${color}" stop-opacity="0"/>` +
+      `<stop offset="0.55" stop-color="${color}" stop-opacity="0"/>` +
+      `<stop offset="1" stop-color="${color}" stop-opacity="${round(o, 3)}"/>` +
+      `</radialGradient>`,
   ];
 
   let anim = "";
   if (flicker > 0) {
     const rand = seededRand(547);
-    const dur  = round(9 / speed, 2);
-    const n    = 18;
-    const vals = [], times = [];
+    const dur = round(9 / speed, 2);
+    const n = 18;
+    const vals = [],
+      times = [];
     for (let k = 0; k < n; k++) {
       vals.push(round(1 - rand() * flicker * 0.5, 3));
       times.push(round(k / n, 3));
     }
-    vals.push(vals[0]); times.push(1);
+    vals.push(vals[0]);
+    times.push(1);
     anim = `<animate attributeName="opacity" values="${vals.join(";")}" keyTimes="${times.join(";")}" dur="${dur}s" repeatCount="indefinite" calcMode="discrete"/>`;
   }
 
-  const els = [`<rect width="${W}" height="${H}" rx="${br}" fill="url(#vgGrad)">${anim}</rect>`];
+  const els = [
+    `<rect width="${W}" height="${H}" rx="${br}" fill="url(#vgGrad)">${anim}</rect>`,
+  ];
 
   return { defs, els, css: "" };
 }
 
 function buildEffects(effects, W, H, br) {
   if (!effects || !effects.length) return { defs: [], els: [], css: "" };
-  const allDefs = [], allEls = [], allCss = [];
+  const allDefs = [],
+    allEls = [],
+    allCss = [];
 
   for (const eff of effects) {
     if (!eff || !eff.enabled) continue;
     let r = null;
     switch (eff.id) {
-      case "lightning":    r = buildLightning(eff, W, H, br); break;
-      case "soundwaves":   r = buildSoundWaves(eff, W, H, br); break;
-      case "particles":    r = buildParticles(eff, W, H, br); break;
-      case "scanlines":    r = buildScanlines(eff, W, H, br); break;
-      case "shimmer":      r = buildShimmer(eff, W, H, br); break;
-      case "pulserings":   r = buildPulseRings(eff, W, H, br); break;
-      case "matrixrain":   r = buildMatrixRain(eff, W, H, br); break;
-      case "borderbeam":   r = buildBorderBeam(eff, W, H, br); break;
-      case "sparkles":     r = buildSparkles(eff, W, H, br); break;
-      case "confetti":     r = buildConfetti(eff, W, H, br); break;
-      case "aurora":       r = buildAurora(eff, W, H, br); break;
-      case "blurrylights": r = buildBlurrylights(eff, W, H, br); break;
-      case "synthgrid":    r = buildSynthGrid(eff, W, H, br); break;
-      case "starfield":    r = buildStarfield(eff, W, H, br); break;
-      case "vignette":     r = buildVignette(eff, W, H, br); break;
+      case "lightning":
+        r = buildLightning(eff, W, H, br);
+        break;
+      case "soundwaves":
+        r = buildSoundWaves(eff, W, H, br);
+        break;
+      case "particles":
+        r = buildParticles(eff, W, H, br);
+        break;
+      case "scanlines":
+        r = buildScanlines(eff, W, H, br);
+        break;
+      case "shimmer":
+        r = buildShimmer(eff, W, H, br);
+        break;
+      case "pulserings":
+        r = buildPulseRings(eff, W, H, br);
+        break;
+      case "matrixrain":
+        r = buildMatrixRain(eff, W, H, br);
+        break;
+      case "borderbeam":
+        r = buildBorderBeam(eff, W, H, br);
+        break;
+      case "sparkles":
+        r = buildSparkles(eff, W, H, br);
+        break;
+      case "confetti":
+        r = buildConfetti(eff, W, H, br);
+        break;
+      case "aurora":
+        r = buildAurora(eff, W, H, br);
+        break;
+      case "blurrylights":
+        r = buildBlurrylights(eff, W, H, br);
+        break;
+      case "synthgrid":
+        r = buildSynthGrid(eff, W, H, br);
+        break;
+      case "starfield":
+        r = buildStarfield(eff, W, H, br);
+        break;
+      case "vignette":
+        r = buildVignette(eff, W, H, br);
+        break;
     }
     if (!r) continue;
     allDefs.push(...r.defs);
@@ -1004,11 +1181,17 @@ export function generateSvg(config) {
   } = config;
 
   const live = sentences.filter((s) => s.text && s.text.length);
-  const list = live.length ? live : [{ text: " ", width: 40, prefixes: [0, 40] }];
+  const list = live.length
+    ? live
+    : [{ text: " ", width: 40, prefixes: [0, 40] }];
   const padding = PADDING;
   const auto = autoSize(list, fontSize);
-  const width = autoWidth ? auto.width : Math.round(clamp(Number(bannerWidth) || auto.width, 80, 4000));
-  const height = autoHeight ? auto.height : Math.round(clamp(Number(bannerHeight) || auto.height, 40, 2000));
+  const width = autoWidth
+    ? auto.width
+    : Math.round(clamp(Number(bannerWidth) || auto.width, 80, 4000));
+  const height = autoHeight
+    ? auto.height
+    : Math.round(clamp(Number(bannerHeight) || auto.height, 40, 2000));
   const baseline = Math.round(height / 2 + fontSize * 0.35);
   const cursorY = Math.round((height - fontSize) / 2);
   const br = Math.min(Number(borderRadius) || 0, width / 2, height / 2);
@@ -1016,7 +1199,8 @@ export function generateSvg(config) {
   const contentWidth = width - padding * 2;
   const geo = list.map((s) => {
     const align = s.align || "left";
-    const canJustify = align === "justify" && /\s/.test(s.text) && s.width < contentWidth;
+    const canJustify =
+      align === "justify" && /\s/.test(s.text) && s.width < contentWidth;
     const renderWidth = canJustify ? contentWidth : s.width;
     const extra = renderWidth - s.width;
     const N = Math.max(1, (s.text || "").length);
@@ -1034,10 +1218,18 @@ export function generateSvg(config) {
       startX: round(startX, 2),
     };
   });
-  const justifyAttr = (g) => (g.justified ? ` textLength="${round(g.width, 2)}" lengthAdjust="spacing"` : "");
+  const justifyAttr = (g) =>
+    g.justified
+      ? ` textLength="${round(g.width, 2)}" lengthAdjust="spacing"`
+      : "";
 
-  const motions = geo.map((g, i) => buildMotion(g.motion, i, fontSize, motionSpeed));
-  const motionCss = motions.filter(Boolean).map((m) => m.css).join("\n    ");
+  const motions = geo.map((g, i) =>
+    buildMotion(g.motion, i, fontSize, motionSpeed),
+  );
+  const motionCss = motions
+    .filter(Boolean)
+    .map((m) => m.css)
+    .join("\n    ");
   const withMotion = (el, i) =>
     motions[i] ? `<g class="${motions[i].className}">${el}</g>` : el;
 
@@ -1062,7 +1254,9 @@ export function generateSvg(config) {
   const bgRect =
     `<rect x="${inset}" y="${inset}" width="${width - sw}" height="${height - sw}" rx="${br}" ` +
     `fill="${bg.fill}" fill-opacity="${bg.opacity}"` +
-    (brd ? ` stroke="${brd.fill}" stroke-opacity="${brd.opacity}" stroke-width="${borderWidth}"` : "") +
+    (brd
+      ? ` stroke="${brd.fill}" stroke-opacity="${brd.opacity}" stroke-width="${borderWidth}"`
+      : "") +
     `/>`;
 
   const textAttrs =
@@ -1083,7 +1277,12 @@ export function generateSvg(config) {
   if (transition === "typing") {
     const mode = typingMode === "char" ? "char" : "smooth";
     const calcMode = mode === "char" ? "discrete" : "linear";
-    const { T, perSentence, cursorPts } = buildTimeline(geo, mode, holdDuration, Math.max(0.1, Number(typingSpeed) || 1));
+    const { T, perSentence, cursorPts } = buildTimeline(
+      geo,
+      mode,
+      holdDuration,
+      Math.max(0.1, Number(typingSpeed) || 1),
+    );
 
     const texts = [];
     geo.forEach((s, i) => {
@@ -1093,7 +1292,12 @@ export function generateSvg(config) {
         <animate attributeName="width" values="${a.values}" keyTimes="${a.keyTimes}" dur="${round(T, 2)}s" calcMode="${calcMode}" repeatCount="indefinite"/>
       </rect>
     </clipPath>`);
-      texts.push(withMotion(`<text x="${s.startX}" y="${baseline}" ${textAttrs}${justifyAttr(s)} clip-path="url(#clip${i})">${escapeXml(s.text)}</text>`, i));
+      texts.push(
+        withMotion(
+          `<text x="${s.startX}" y="${baseline}" ${textAttrs}${justifyAttr(s)} clip-path="url(#clip${i})">${escapeXml(s.text)}</text>`,
+          i,
+        ),
+      );
     });
 
     let cursorEl = "";
@@ -1114,7 +1318,9 @@ export function generateSvg(config) {
       effEls,
       ...texts,
       cursorEl,
-    ].filter(Boolean).join("\n  ");
+    ]
+      .filter(Boolean)
+      .join("\n  ");
     return wrap(width, height, geo[0].text, inner, linkUrl);
   }
 
@@ -1125,15 +1331,33 @@ export function generateSvg(config) {
       defs.length ? `<defs>\n    ${defs.join("\n    ")}\n  </defs>` : "",
       bgRect,
       effEls,
-      withMotion(`<text x="${g0.startX}" y="${baseline}" ${textAttrs}${justifyAttr(g0)}>${escapeXml(g0.text)}</text>`, 0),
-    ].filter(Boolean).join("\n  ");
+      withMotion(
+        `<text x="${g0.startX}" y="${baseline}" ${textAttrs}${justifyAttr(g0)}>${escapeXml(g0.text)}</text>`,
+        0,
+      ),
+    ]
+      .filter(Boolean)
+      .join("\n  ");
     return wrap(width, height, g0.text, inner, linkUrl);
   }
 
-  const trans = transition === "none" ? 0.05 : clamp(Number(transitionDuration) || 0.6, 0.05, 3);
-  const { css: transCss } = buildTransitionCss(liveCount, transition, Math.max(0.1, Number(holdDuration) || 1.5), trans, width, fontSize);
-  const transTexts = geo.map(
-    (s, i) => withMotion(`<text class="tt tt${i}" x="${s.startX}" y="${baseline}" ${textAttrs}${justifyAttr(s)}>${escapeXml(s.text)}</text>`, i)
+  const trans =
+    transition === "none"
+      ? 0.05
+      : clamp(Number(transitionDuration) || 0.6, 0.05, 3);
+  const { css: transCss } = buildTransitionCss(
+    liveCount,
+    transition,
+    Math.max(0.1, Number(holdDuration) || 1.5),
+    trans,
+    width,
+    fontSize,
+  );
+  const transTexts = geo.map((s, i) =>
+    withMotion(
+      `<text class="tt tt${i}" x="${s.startX}" y="${baseline}" ${textAttrs}${justifyAttr(s)}>${escapeXml(s.text)}</text>`,
+      i,
+    ),
   );
   const inner = [
     styleBlock([fontFaceCss, effCss, transCss, motionCss]),
@@ -1141,7 +1365,9 @@ export function generateSvg(config) {
     bgRect,
     effEls,
     ...transTexts,
-  ].filter(Boolean).join("\n  ");
+  ]
+    .filter(Boolean)
+    .join("\n  ");
   return wrap(width, height, geo[0].text, inner, linkUrl);
 }
 
@@ -1166,6 +1392,9 @@ export function normalizeUrl(url) {
 
 function escapeXml(s) {
   return String(s)
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }
