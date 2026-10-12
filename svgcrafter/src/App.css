@@ -301,6 +301,30 @@ fieldset.tpl-lock:disabled {
   filter: brightness(1.15);
 }
 
+.tpl-header {
+  cursor: pointer;
+  user-select: none;
+}
+.tpl-header:hover .eff-chevron {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.tpl-header:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.tpl-checkbox {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.tpl-desc {
+  cursor: pointer;
+  user-select: none;
+}
+
 .tabpanel {
   padding: 20px;
   animation: rise 0.4s ease both;

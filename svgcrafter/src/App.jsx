@@ -1453,30 +1453,50 @@ function EffectsTab({ effects, onChange }) {
 }
 
 function TemplateCard({ tpl, active, value, onToggle, onChange, Section }) {
-  const [open, toggleOpen] = useRememberedOpen(`tpl:${tpl.id}`, true);
+  const [open, toggleOpen] = useRememberedOpen(`tpl:${tpl.id}`, false);
 
   return (
     <div className={"eff-card" + (active ? " eff-on" : "")}>
-      <div className="eff-header">
-        <label className="eff-toggle-row">
-          <input
-            type="checkbox"
-            checked={active}
-            onChange={(e) => onToggle(e.target.checked)}
-          />
-          <span className="eff-label">{tpl.name}</span>
-        </label>
-        <button
-          type="button"
+      <div
+        className="eff-header tpl-header"
+        onClick={toggleOpen}
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+        onKeyDown={(e) => {
+          if (
+            e.target === e.currentTarget &&
+            (e.key === "Enter" || e.key === " ")
+          ) {
+            e.preventDefault();
+            toggleOpen();
+          }
+        }}
+      >
+        <input
+          type="checkbox"
+          className="tpl-checkbox"
+          checked={active}
+          onChange={(e) => onToggle(e.target.checked)}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Enable ${tpl.name}`}
+        />
+        <span className="eff-label" style={{ flex: 1 }}>
+          {tpl.name}
+        </span>
+        <span
           className={"eff-chevron" + (open ? " open" : "")}
-          onClick={toggleOpen}
-          aria-label={open ? "Collapse" : "Expand"}
+          aria-hidden="true"
         >
           ›
-        </button>
+        </span>
       </div>
 
-      {!open && <p className="eff-desc">{tpl.desc}</p>}
+      {!open && (
+        <p className="eff-desc tpl-desc" onClick={toggleOpen}>
+          {tpl.desc}
+        </p>
+      )}
 
       {open && (
         <div style={{ marginTop: "12px" }}>

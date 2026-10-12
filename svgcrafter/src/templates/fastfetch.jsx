@@ -473,17 +473,54 @@ function Editor({ value, onChange, Section }) {
         </label>
       </Section>
 
-      <Section title="Logo" defaultOpen summary={`Letter '${value.letter}'`}>
+      <Section title="Logo" defaultOpen summary={`Letter '${value.letter || "S"}'`}>
         <div className="field">
           <span>Logo letter (A–Z, 0–9)</span>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <input
               type="text"
               value={value.letter}
-              maxLength={1}
+              autoComplete="off"
+              spellCheck="false"
+              onFocus={(e) => e.target.select()}
+              onClick={(e) => e.target.select()}
+              onKeyDown={(e) => {
+                if (e.key === "Tab" || e.key === "Escape" || e.key === "Enter") return;
+                if (e.key === "Backspace" || e.key === "Delete") {
+                  e.preventDefault();
+                  patch({ letter: "" });
+                  return;
+                }
+                if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                  if (/^[a-zA-Z0-9]$/.test(e.key)) {
+                    e.preventDefault();
+                    patch({ letter: e.key.toUpperCase() });
+                    requestAnimationFrame(() => e.target.select());
+                  } else {
+                    e.preventDefault();
+                  }
+                }
+              }}
               onChange={(e) => {
-                const char = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
-                patch({ letter: char || "S" });
+                const raw = e.target.value;
+                const upper = raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
+                if (!upper) {
+                  patch({ letter: "" });
+                  return;
+                }
+                let char = upper.slice(-1);
+                if (value.letter && upper.length > 1) {
+                  const withoutOld = upper.replace(value.letter.toUpperCase(), "");
+                  if (withoutOld.length > 0) {
+                    char = withoutOld[0];
+                  }
+                }
+                patch({ letter: char });
+              }}
+              onBlur={() => {
+                if (!value.letter) {
+                  patch({ letter: "S" });
+                }
               }}
               style={{
                 width: "48px",
@@ -491,6 +528,7 @@ function Editor({ value, onChange, Section }) {
                 fontSize: "18px",
                 fontWeight: 700,
                 fontFamily: "monospace",
+                textTransform: "uppercase",
               }}
             />
             <span style={{ fontSize: "12px", color: "var(--muted)" }}>
