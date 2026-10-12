@@ -222,9 +222,14 @@ body {
   z-index: 1;
   display: flex;
   gap: 2px;
-  padding: 0 14px;
+  padding: 0 10px;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs::-webkit-scrollbar {
+  display: none;
 }
 .tab {
   background: none;
@@ -232,11 +237,13 @@ body {
   border-bottom: 2px solid transparent;
   color: var(--muted);
   font-family: var(--font-body);
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
-  padding: 14px 12px;
+  padding: 14px 10px;
   cursor: pointer;
   margin-bottom: -1px;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition:
     color 0.15s,
     border-color 0.15s;

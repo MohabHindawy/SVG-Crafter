@@ -104,9 +104,9 @@ const familyFor = (fontId, embedFont) =>
 
 const TABS = [
   { id: "text", label: "Text" },
-  { id: "border", label: "Border" },
-  { id: "background", label: "Background" },
+  { id: "border-background", label: "Background" },
   { id: "effects", label: "Effects" },
+  { id: "templates", label: "Templates" },
 ];
 
 const MAX_SENTENCES = 6;
@@ -2723,7 +2723,9 @@ export default function App() {
               </>
             )}
 
-            {tab === "border" && (
+            {(tab === "border-background" ||
+              tab === "border" ||
+              tab === "background") && (
               <>
                 <Section
                   title="Border"
@@ -2774,11 +2776,6 @@ export default function App() {
                     />
                   </label>
                 </Section>
-              </>
-            )}
-
-            {tab === "background" && (
-              <>
                 <Section
                   title="Dimensions"
                   defaultOpen
@@ -2866,6 +2863,10 @@ export default function App() {
                 effects={config.effects}
                 onChange={(effects) => setConfig((c) => ({ ...c, effects }))}
               />
+            )}
+
+            {tab === "templates" && (
+              <div className="tab-empty">{/* Empty for now */}</div>
             )}
           </div>
         </aside>
