@@ -172,13 +172,11 @@ export const DEFAULT_THEME_ID = "terminal";
 
 export const TERMINAL_NAMES = [
   "Konsole",
-  "GNOME Terminal",
-  "Alacritty",
-  "Kitty",
-  "iTerm2",
-  "Windows Terminal",
-  "WezTerm",
   "Terminal",
+  "Kitty",
+  "GNOME",
+  "Alacritty",
+  "WezTerm",
 ];
 
 export function ColorField({ label, value, onChange }) {

@@ -397,8 +397,8 @@ function generate(rawCfg) {
   return xml;
 }
 
-function alt(cfg) {
-  return `${cfg?.terminalName || "Konsole"} terminal running fastfetch`;
+function alt() {
+  return "fastfetch";
 }
 
 function Editor({ value, onChange, Section }) {
