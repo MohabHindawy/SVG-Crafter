@@ -32,6 +32,36 @@ export const hex = (v, fallback = "#000000") => {
 
 export const THEMES = [
   {
+    id: "terminal",
+    name: "Terminal",
+    roles: {
+      bg: "#000000",
+      surface: "#121212",
+      surfaceBorder: "#1e1e1e",
+      border: "#2e2e2e",
+      text: "#e5e5e5",
+      muted: "#737373",
+      primary: "#58a6ff",
+      primaryDim: "#1f3a5f",
+      secondary: "#1f6feb",
+    },
+  },
+  {
+    id: "matrix",
+    name: "Matrix",
+    roles: {
+      bg: "#080c08",
+      surface: "#0e170e",
+      surfaceBorder: "#142214",
+      border: "#1c3820",
+      text: "#bbf7d0",
+      muted: "#3d7348",
+      primary: "#22c55e",
+      primaryDim: "#0e3b18",
+      secondary: "#16a34a",
+    },
+  },
+  {
     id: "dracula",
     name: "Dracula",
     roles: {
@@ -63,7 +93,7 @@ export const THEMES = [
   },
   {
     id: "gruvbox",
-    name: "Gruvbox Dark",
+    name: "Gruvbox",
     roles: {
       bg: "#282828",
       surface: "#1d2021",
@@ -78,7 +108,7 @@ export const THEMES = [
   },
   {
     id: "catppuccin",
-    name: "Catppuccin Mocha",
+    name: "Catppuccin",
     roles: {
       bg: "#1e1e2e",
       surface: "#181825",
@@ -121,9 +151,24 @@ export const THEMES = [
       secondary: "#98c379",
     },
   },
+  {
+    id: "monokai",
+    name: "Monokai",
+    roles: {
+      bg: "#272822",
+      surface: "#1e1f1c",
+      surfaceBorder: "#141512",
+      border: "#49483e",
+      text: "#f8f8f2",
+      muted: "#75715e",
+      primary: "#f92672",
+      primaryDim: "#54192d",
+      secondary: "#a6e22e",
+    },
+  },
 ];
 
-export const DEFAULT_THEME_ID = "dracula";
+export const DEFAULT_THEME_ID = "terminal";
 
 export const TERMINAL_NAMES = [
   "Konsole",
@@ -197,14 +242,6 @@ export function ThemePicker({ value, onPick }) {
           {theme.name}
         </button>
       ))}
-      <button
-        type="button"
-        className={`font-chip${value === "custom" ? " on" : ""}`}
-        disabled
-        style={{ cursor: "default", opacity: value === "custom" ? 1 : 0.5 }}
-      >
-        Custom
-      </button>
     </div>
   );
 }

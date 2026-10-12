@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   generateSvg,
   adjustBrightness,
@@ -1327,8 +1327,26 @@ function EffectCard({ meta, eff, onChange }) {
 
   return (
     <div className={"eff-card" + (eff.enabled ? " eff-on" : "")}>
-      <div className="eff-header">
-        <label className="eff-toggle-row">
+      <div
+        className="eff-header"
+        onClick={toggleOpen}
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+        onKeyDown={(e) => {
+          if (
+            e.target === e.currentTarget &&
+            (e.key === "Enter" || e.key === " ")
+          ) {
+            e.preventDefault();
+            toggleOpen();
+          }
+        }}
+      >
+        <label
+          className="eff-toggle-row"
+          onClick={(e) => e.stopPropagation()}
+        >
           <input
             type="checkbox"
             checked={eff.enabled}
@@ -1336,14 +1354,12 @@ function EffectCard({ meta, eff, onChange }) {
           />
           <span className="eff-label">{meta.label}</span>
         </label>
-        <button
-          type="button"
+        <span
           className={"eff-chevron" + (open ? " open" : "")}
-          onClick={toggleOpen}
-          aria-label={open ? "Collapse" : "Expand"}
+          aria-hidden="true"
         >
           ›
-        </button>
+        </span>
       </div>
 
       {!open && <p className="eff-desc">{meta.desc}</p>}
@@ -2037,6 +2053,119 @@ function parseImportedSvg(text) {
   return { config: cfg, foreign: true };
 }
 
+function morphDom(current, target) {
+  if (
+    current.nodeType !== target.nodeType ||
+    current.nodeName !== target.nodeName
+  ) {
+    current.replaceWith(target.cloneNode(true));
+    return;
+  }
+
+  if (current.nodeType === Node.TEXT_NODE) {
+    if (current.nodeValue !== target.nodeValue) {
+      current.nodeValue = target.nodeValue;
+    }
+    return;
+  }
+
+  if (current.nodeType === Node.ELEMENT_NODE) {
+    const curAttrs = current.attributes;
+    const tgtAttrs = target.attributes;
+
+    for (let i = curAttrs.length - 1; i >= 0; i--) {
+      const a = curAttrs[i];
+      if (!target.hasAttribute(a.name)) {
+        current.removeAttribute(a.name);
+      }
+    }
+
+    for (let i = 0; i < tgtAttrs.length; i++) {
+      const a = tgtAttrs[i];
+      if (current.getAttribute(a.name) !== a.value) {
+        current.setAttribute(a.name, a.value);
+      }
+    }
+
+    if (current.nodeName.toLowerCase() === "style") {
+      if (current.textContent !== target.textContent) {
+        current.textContent = target.textContent;
+      }
+      return;
+    }
+
+    const curChildren = Array.from(current.childNodes);
+    const tgtChildren = Array.from(target.childNodes);
+    const maxLen = Math.max(curChildren.length, tgtChildren.length);
+
+    for (let i = 0; i < maxLen; i++) {
+      const c = curChildren[i];
+      const t = tgtChildren[i];
+      if (c && !t) {
+        c.remove();
+      } else if (!c && t) {
+        current.appendChild(t.cloneNode(true));
+      } else if (c && t) {
+        morphDom(c, t);
+      }
+    }
+  }
+}
+
+function SvgPreview({ svg, alt }) {
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    try {
+      const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
+      const newSvg = doc.querySelector("svg");
+      if (!newSvg || doc.querySelector("parsererror")) {
+        container.innerHTML = svg;
+        return;
+      }
+
+      const currentSvg = container.querySelector("svg");
+      if (!currentSvg) {
+        container.replaceChildren(newSvg);
+        return;
+      }
+
+      let currentTime = 0;
+      try {
+        if (typeof currentSvg.getCurrentTime === "function") {
+          currentTime = currentSvg.getCurrentTime();
+        }
+      } catch {
+        // ignore
+      }
+
+      morphDom(currentSvg, newSvg);
+
+      try {
+        if (currentTime > 0 && typeof currentSvg.setCurrentTime === "function") {
+          currentSvg.setCurrentTime(currentTime);
+        }
+      } catch {
+        // ignore
+      }
+    } catch {
+      container.innerHTML = svg;
+    }
+  }, [svg]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="svg-preview-wrap"
+      role="img"
+      aria-label={alt}
+    />
+  );
+}
+
 export default function App() {
   const [tab, setTab] = useState("text");
   const [copied, setCopied] = useState("");
@@ -2284,7 +2413,6 @@ export default function App() {
       bannerHeight: isAuto ? c.bannerHeight : auto.height,
     }));
 
-  const dataUri = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   const link = normalizeUrl(config.linkUrl);
   const alt = activeTpl
     ? activeTpl.alt(config.template?.configs?.[activeTpl.id])
@@ -3012,11 +3140,7 @@ export default function App() {
           <section className="preview">
             <h2>Preview</h2>
             <div className="stage">
-              <img
-                key={dataUri}
-                src={dataUri}
-                alt={alt}
-              />
+              <SvgPreview svg={svg} alt={alt} />
             </div>
           </section>
 

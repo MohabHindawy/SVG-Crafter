@@ -899,9 +899,17 @@ input:disabled {
   justify-content: center;
   padding: 24px;
 }
-.stage img {
+.stage img,
+.stage svg {
   max-width: 100%;
   height: auto;
+  display: block;
+}
+.svg-preview-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
 }
 
 .actions {
@@ -1060,7 +1068,16 @@ input:disabled {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 11px 12px 9px;
+  padding: 11px 14px 9px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+.eff-header:hover {
+  background: var(--check);
+}
+.eff-header:hover .eff-chevron {
+  color: var(--accent);
 }
 .eff-toggle-row {
   display: flex;
@@ -1091,33 +1108,27 @@ input:disabled {
 }
 
 .eff-chevron {
-  width: 26px;
-  height: 26px;
-  flex: none;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  background: none;
+  border: none;
   color: var(--muted);
-  font-size: 16px;
+  font-size: 20px;
   line-height: 1;
+  flex: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-left: auto;
   transition:
-    color 0.15s,
-    border-color 0.15s,
-    transform 0.18s;
-  padding-bottom: 1px;
+    transform 0.2s,
+    color 0.15s;
 }
 .eff-chevron:hover {
   color: var(--accent);
-  border-color: var(--accent);
 }
 .eff-chevron.open {
   transform: rotate(90deg);
   color: var(--accent);
-  border-color: var(--accent);
 }
 
 .eff-desc {

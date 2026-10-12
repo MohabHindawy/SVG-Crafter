@@ -5,6 +5,7 @@ import {
   escapeXml,
   hex,
   THEMES,
+  DEFAULT_THEME_ID,
   TERMINAL_NAMES,
   ColorField,
   ThemePicker,
@@ -169,7 +170,8 @@ function fromTheme(roles) {
 }
 
 function defaults() {
-  const draculaTheme = THEMES.find((t) => t.id === "dracula") || THEMES[0];
+  const defaultTheme =
+    THEMES.find((t) => t.id === DEFAULT_THEME_ID) || THEMES[0];
   return {
     terminalName: "Konsole",
     letter: "S",
@@ -180,8 +182,8 @@ function defaults() {
       { id: "row-3", label: "Editor", value: "Your editor" },
       { id: "row-4", label: "Status", value: "Something playful" },
     ],
-    themeId: "dracula",
-    colors: fromTheme(draculaTheme.roles),
+    themeId: defaultTheme.id,
+    colors: fromTheme(defaultTheme.roles),
   };
 }
 
@@ -654,7 +656,11 @@ function Editor({ value, onChange, Section }) {
         </div>
       </Section>
 
-      <Section title="Colours & Theme" defaultOpen summary={value.themeId}>
+      <Section
+        title="Colours & Theme"
+        defaultOpen
+        summary={THEMES.find((t) => t.id === value.themeId)?.name || "Custom"}
+      >
         <ThemePicker value={value.themeId} onPick={onPickTheme} />
 
         <div className="subgroup">
@@ -757,15 +763,6 @@ function Editor({ value, onChange, Section }) {
             onChange={(v) => patchColor("value", v)}
           />
         </div>
-
-        <button
-          type="button"
-          className="add"
-          onClick={() => patch(defaults())}
-          style={{ width: "100%", marginTop: "12px" }}
-        >
-          Reset to Dracula defaults
-        </button>
       </Section>
     </div>
   );
