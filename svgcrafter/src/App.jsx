@@ -5,6 +5,12 @@ import {
   autoSize,
   normalizeUrl,
 } from "./generateSvg";
+import {
+  TEMPLATES,
+  getTemplate,
+  defaultTemplateState,
+  sanitizeTemplateState,
+} from "./templates";
 import "./App.css";
 
 // Font styles must match SVG text attributes so canvas measurement aligns with SVG typewriter clip paths.
@@ -1446,6 +1452,62 @@ function EffectsTab({ effects, onChange }) {
   );
 }
 
+function TemplateCard({ tpl, active, value, onToggle, onChange, Section }) {
+  const [open, toggleOpen] = useRememberedOpen(`tpl:${tpl.id}`, true);
+
+  return (
+    <div className={"eff-card" + (active ? " eff-on" : "")}>
+      <div className="eff-header">
+        <label className="eff-toggle-row">
+          <input
+            type="checkbox"
+            checked={active}
+            onChange={(e) => onToggle(e.target.checked)}
+          />
+          <span className="eff-label">{tpl.name}</span>
+        </label>
+        <button
+          type="button"
+          className={"eff-chevron" + (open ? " open" : "")}
+          onClick={toggleOpen}
+          aria-label={open ? "Collapse" : "Expand"}
+        >
+          ›
+        </button>
+      </div>
+
+      {!open && <p className="eff-desc">{tpl.desc}</p>}
+
+      {open && (
+        <div style={{ marginTop: "12px" }}>
+          <tpl.Editor value={value} onChange={onChange} Section={Section} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TemplatesTab({ template, setActive, setCfg, Section }) {
+  return (
+    <div
+      className="templates-tab"
+      style={{ display: "flex", flexDirection: "column", gap: "10px" }}
+    >
+      {TEMPLATES.map((tpl) => (
+        <TemplateCard
+          key={tpl.id}
+          tpl={tpl}
+          active={template?.active === tpl.id}
+          value={template?.configs?.[tpl.id]}
+          onToggle={(on) => setActive(on ? tpl.id : null)}
+          onChange={(next) => setCfg(tpl.id, next)}
+          Section={Section}
+        />
+      ))}
+    </div>
+  );
+}
+
 const defaultConfig = () => ({
   sentences: ["Welcome 👋", "SVG Crafter"],
   sentenceAligns: ["left", "left"],
@@ -1476,6 +1538,7 @@ const defaultConfig = () => ({
   bannerHeight: 120,
   linkUrl: "",
   effects: EFFECT_DEFAULTS,
+  template: defaultTemplateState(),
 });
 
 // Chunking avoids maximum call stack size limits in String.fromCharCode.
@@ -1528,6 +1591,8 @@ function sanitizeConfig(raw) {
     const found = imported.find((e) => e && e.id === d.id);
     return found ? { ...d, ...found } : d;
   });
+
+  cfg.template = sanitizeTemplateState(raw?.template);
 
   return cfg;
 }
@@ -1960,6 +2025,18 @@ export default function App() {
   const [importNote, setImportNote] = useState(null);
   const [config, setConfig] = useState(defaultConfig);
 
+  const setActiveTemplate = (id) =>
+    setConfig((c) => ({ ...c, template: { ...c.template, active: id } }));
+  const setTemplateCfg = (id, next) =>
+    setConfig((c) => ({
+      ...c,
+      template: {
+        ...c.template,
+        configs: { ...c.template.configs, [id]: next },
+      },
+    }));
+  const activeTpl = getTemplate(config.template?.active);
+
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", "dark");
   }, []);
@@ -2065,8 +2142,11 @@ export default function App() {
     [measured, config.fontSize],
   );
   const svg = useMemo(
-    () => generateSvg({ ...config, sentences: measured, fontFamily }),
-    [config, measured, fontFamily],
+    () =>
+      activeTpl
+        ? activeTpl.generate(config.template?.configs?.[activeTpl.id])
+        : generateSvg({ ...config, sentences: measured, fontFamily }),
+    [config, measured, fontFamily, activeTpl],
   );
 
   const [fontStatus, setFontStatus] = useState({ state: "idle", msg: "" });
@@ -2186,7 +2266,9 @@ export default function App() {
 
   const dataUri = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
   const link = normalizeUrl(config.linkUrl);
-  const alt = config.sentences[0] || "banner";
+  const alt = activeTpl
+    ? activeTpl.alt(config.template?.configs?.[activeTpl.id])
+    : config.sentences[0] || "banner";
   const safeName =
     fileName
       .trim()
@@ -2211,7 +2293,14 @@ export default function App() {
         return;
       }
       setConfig(parsed.config);
+      if (parsed.config?.template?.active) {
+        setTab("templates");
+      }
       setFileName(file.name.replace(/\.svg$/i, "") || "banner");
+      const isTpl = !!parsed.config?.template?.active;
+      const tplName = isTpl
+        ? getTemplate(parsed.config.template.active)?.name || "Template"
+        : null;
       setImportNote(
         parsed.foreign
           ? {
@@ -2223,7 +2312,12 @@ export default function App() {
                 kind: "ok",
                 msg: "Older SVG Crafter export imported — settings recovered from the artwork; effect fine-tuning and animation speeds use defaults.",
               }
-            : { kind: "ok", msg: "Banner imported — full settings restored." },
+            : isTpl
+              ? {
+                  kind: "ok",
+                  msg: `${tplName} imported — full settings restored.`,
+                }
+              : { kind: "ok", msg: "Banner imported — full settings restored." },
       );
     };
     reader.onerror = () =>
@@ -2247,6 +2341,8 @@ export default function App() {
     URL.revokeObjectURL(url);
   }
 
+  const locked = !!config.template?.active && tab !== "templates";
+
   return (
     <div className="app">
       <div className="workspace">
@@ -2257,7 +2353,12 @@ export default function App() {
                 key={t.id}
                 role="tab"
                 aria-selected={tab === t.id}
-                className={tab === t.id ? "tab active" : "tab"}
+                className={
+                  (tab === t.id ? "tab active" : "tab") +
+                  (t.id === "templates" && config.template?.active
+                    ? " tab-tpl-on"
+                    : "")
+                }
                 onClick={() => setTab(t.id)}
               >
                 {t.label}
@@ -2272,7 +2373,25 @@ export default function App() {
           </div>
 
           <div className="tabpanel">
-            {tab === "text" && (
+            {locked && (
+              <div className="tpl-lock-note">
+                <span>Cannot edit these options while a template is active.</span>
+                <button type="button" onClick={() => setTab("templates")}>
+                  Edit template
+                </button>
+              </div>
+            )}
+
+            {tab === "templates" ? (
+              <TemplatesTab
+                template={config.template}
+                setActive={setActiveTemplate}
+                setCfg={setTemplateCfg}
+                Section={Section}
+              />
+            ) : (
+              <fieldset className="tpl-lock" disabled={locked}>
+                {tab === "text" && (
               <>
                 <Section
                   title="Sentences"
@@ -2864,9 +2983,7 @@ export default function App() {
                 onChange={(effects) => setConfig((c) => ({ ...c, effects }))}
               />
             )}
-
-            {tab === "templates" && (
-              <div className="tab-empty">{/* Empty for now */}</div>
+              </fieldset>
             )}
           </div>
         </aside>
@@ -2878,7 +2995,7 @@ export default function App() {
               <img
                 key={dataUri}
                 src={dataUri}
-                alt={config.sentences[0] || "preview"}
+                alt={alt}
               />
             </div>
           </section>
