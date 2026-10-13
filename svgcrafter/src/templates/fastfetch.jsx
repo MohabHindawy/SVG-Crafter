@@ -1,4 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
+import { useState } from "react";
 import {
   clamp,
   round,
@@ -483,6 +484,7 @@ function alt() {
 }
 
 function Editor({ value, onChange, Section, onReplay }) {
+  const [dragRow, setDragRow] = useState(null);
   const patch = (updates) => onChange({ ...value, ...updates });
   const patchColors = (updates) =>
     onChange({
@@ -677,11 +679,24 @@ function Editor({ value, onChange, Section, onReplay }) {
             style={{ display: "flex", flexDirection: "column", gap: "8px" }}
           >
             {value.rows.map((row, idx) => {
+              const multi = value.rows.length > 1;
               const totalLen = row.label.length + row.value.length;
+              const dragOverRow = () => {
+                if (dragRow == null) return;
+                const from = value.rows.findIndex((r) => r.id === dragRow);
+                if (from === -1 || from === idx) return;
+                moveRow(from, idx);
+              };
               return (
                 <div
                   key={row.id}
-                  className="sentence-item"
+                  className={
+                    "sentence-item" + (dragRow === row.id ? " dragging" : "")
+                  }
+                  onDragEnter={multi ? dragOverRow : undefined}
+                  onDragOver={multi ? (e) => e.preventDefault() : undefined}
+                  onDrop={multi ? (e) => e.preventDefault() : undefined}
+                  onDragEnd={multi ? () => setDragRow(null) : undefined}
                   style={{
                     background: "var(--panel)",
                     border: "1px solid var(--border)",
@@ -697,27 +712,42 @@ function Editor({ value, onChange, Section, onReplay }) {
                       marginBottom: "6px",
                     }}
                   >
-                    <div
-                      className="s-arrows"
-                      style={{ display: "flex", gap: "2px" }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => moveRow(idx, idx - 1)}
-                        disabled={idx === 0}
-                        aria-label="Move row up"
-                      >
-                        ▲
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => moveRow(idx, idx + 1)}
-                        disabled={idx === value.rows.length - 1}
-                        aria-label="Move row down"
-                      >
-                        ▼
-                      </button>
-                    </div>
+                    {multi && (
+                      <div className="s-reorder">
+                        <span
+                          className="grip"
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.effectAllowed = "move";
+                            e.dataTransfer.setData("text/plain", "");
+                            setDragRow(row.id);
+                          }}
+                          role="button"
+                          aria-label="Drag to reorder row"
+                          title="Drag to reorder"
+                        >
+                          ⠿
+                        </span>
+                        <div className="s-arrows">
+                          <button
+                            type="button"
+                            onClick={() => moveRow(idx, idx - 1)}
+                            disabled={idx === 0}
+                            aria-label="Move row up"
+                          >
+                            ▲
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveRow(idx, idx + 1)}
+                            disabled={idx === value.rows.length - 1}
+                            aria-label="Move row down"
+                          >
+                            ▼
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     <span
                       style={{
                         fontSize: "11px",
