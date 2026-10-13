@@ -50,12 +50,12 @@ const LOGO_TIERS = [
   "00000000000000111",
 ];
 
-// Empty hexagon: replace tier-3 cells with '+' at tier 2
+// Empty hexagon: clear the interior glyph window (rows 5..9, cols 8..20) and tier-3 cells to '+' at tier 2
 const EMPTY_HEX_ROWS = LOGO_CHARS.map((chars, r) => {
   const charsArr = chars.split("");
   const tiersArr = LOGO_TIERS[r].split("");
   for (let c = 0; c < tiersArr.length; c++) {
-    if (tiersArr[c] === "3") {
+    if (tiersArr[c] === "3" || (r >= 5 && r <= 9 && c >= 8 && c <= 20)) {
       charsArr[c] = "+";
       tiersArr[c] = "2";
     }
@@ -66,7 +66,8 @@ const EMPTY_HEX_ROWS = LOGO_CHARS.map((chars, r) => {
   };
 });
 
-// Built-in 5x5 pixel font for A-Z and 0-9
+
+// Built-in 5x5 pixel font for procedural 3D extrusion of remaining characters
 const GLYPHS_5X5 = {
   A: [".###.", "#...#", "#####", "#...#", "#...#"],
   B: ["####.", "#...#", "####.", "#...#", "####."],
@@ -106,43 +107,90 @@ const GLYPHS_5X5 = {
   9: [".###.", "#...#", ".####", "....#", "####."],
 };
 
+// 3D letter wrapped onto the globe: each of the 5 window rows samples the pixel font along a
+// horizontal arc of the sphere (so strokes bend and darken toward the edge), and every cell is
+// anti-aliased into a density ramp so edges ease into the background. Constants were fitted so the
+// "M" matches the reference artwork. Tiers: 3 letter, 2 background (dim halo / shadow).
+const GLOBE = { r: 175.88, shift: -3.98, lean: 0.329, px: 17.05, sharp: 2.28, limb: 1.306 };
+const INK = { gamma: 0.504, topLight: 0.049 };
+const HALO = { left: 0.091, right: 1.142, up: 0.054, down: 0.587, gain: 0.843 };
+const RAMP = [[0.9, "Q"], [0.7, "0"], [0.55, "O"], [0.4, "o"], [0.3, "~"], [0.18, ":"], [0.08, "."]];
+const CELL_W = 8.4;
+const CELL_H = 19;
+const SAMPLES = 9;
+
+const rampChar = (v) => RAMP.find(([min]) => v >= min)?.[1];
+
+function get3dGlyph(char) {
+  const raw = GLYPHS_5X5[char] || GLYPHS_5X5.S;
+
+  // brightness of every window cell (5 rows x 13 cols)
+  const ink = raw.map((line, r) => {
+    const ey = (r - 2) * CELL_H;
+    const cosLat = Math.sqrt(Math.max(1e-6, 1 - (ey / GLOBE.r) ** 2));
+    const pix = (i) => (i >= 0 && i < 5 && line[i] === "#" ? 1 : 0);
+    return Array.from({ length: 13 }, (_, c) => {
+      let sum = 0;
+      for (let i = 0; i < SAMPLES; i++) {
+        const ex = c * CELL_W + ((i + 0.5) / SAMPLES) * CELL_W - (6.5 * CELL_W + GLOBE.shift);
+        const arg = ex / (GLOBE.r * cosLat);
+        if (Math.abs(arg) >= 0.999) continue;
+        const s = GLOBE.r * Math.asin(arg) + GLOBE.lean * (r - 2) * CELL_W;
+        const fx = s / GLOBE.px + 2;
+        const x0 = Math.floor(fx);
+        const t = fx - x0;
+        const b = pix(x0) * (1 - t) + pix(x0 + 1) * t;
+        const cover = clamp((b - 0.5) * GLOBE.sharp + 0.5, 0, 1);
+        const facing = Math.sqrt(Math.max(0, 1 - (ex * ex + ey * ey) / GLOBE.r ** 2));
+        sum += cover * facing ** GLOBE.limb;
+      }
+      return (sum / SAMPLES) * (1 - INK.topLight * (r / 4));
+    });
+  });
+
+  const at = (r, c) => (ink[r] && ink[r][c]) || 0;
+  const chars = [];
+  const tiers = [];
+  for (let r = 0; r < 5; r++) {
+    let cs = "";
+    let ts = "";
+    for (let c = 0; c < 13; c++) {
+      const body = rampChar(Math.pow(ink[r][c], INK.gamma));
+      const halo = rampChar(
+        HALO.gain * (HALO.left * at(r, c + 1) + HALO.right * at(r, c - 1) + HALO.up * at(r + 1, c) + HALO.down * at(r - 1, c)),
+      );
+      cs += body || halo || "+";
+      ts += body ? "3" : "2";
+    }
+    chars.push(cs);
+    tiers.push(ts);
+  }
+  return [chars, tiers];
+}
+
 const logoCache = new Map();
 
 function buildLogo(letter = "S") {
   const norm = String(letter || "S").toUpperCase().trim()[0] || "S";
-  const valid = (norm >= "A" && norm <= "Z") || (norm >= "0" && norm <= "9") ? norm : "S";
-  if (logoCache.has(valid)) {
-    return logoCache.get(valid);
-  }
+  const valid = /^[A-Z0-9]$/.test(norm) ? norm : "S";
+  if (logoCache.has(valid)) return logoCache.get(valid);
 
-  const glyph = GLYPHS_5X5[valid] || GLYPHS_5X5.S;
-  // Center: col 10 in rows 5..9
-  const startCol = 10;
+  const [glyphChars, glyphTiers] = get3dGlyph(valid);
   const grid = EMPTY_HEX_ROWS.map((row, rIdx) => {
-    const charsArr = row.chars.split("");
-    const tiersArr = row.tiers.split("");
-    if (rIdx >= 5 && rIdx <= 9) {
-      const gRow = glyph[rIdx - 5];
-      for (let gCol = 0; gCol < 5; gCol++) {
-        if (gRow[gCol] === "#") {
-          const c1 = startCol + gCol * 2;
-          const c2 = c1 + 1;
-          charsArr[c1] = "Q";
-          tiersArr[c1] = "3";
-          charsArr[c2] = "Q";
-          tiersArr[c2] = "3";
-        }
-      }
+    if (rIdx < 5 || rIdx > 9) return row;
+    const chars = row.chars.split("");
+    const tiers = row.tiers.split("");
+    for (let c = 0; c < 13; c++) {
+      chars[8 + c] = glyphChars[rIdx - 5][c];
+      tiers[8 + c] = glyphTiers[rIdx - 5][c];
     }
-    return {
-      chars: charsArr.join(""),
-      tiers: tiersArr.join(""),
-    };
+    return { chars: chars.join(""), tiers: tiers.join("") };
   });
 
   logoCache.set(valid, grid);
   return grid;
 }
+
 
 function fromTheme(roles) {
   return {
@@ -534,7 +582,7 @@ function Editor({ value, onChange, Section }) {
               }}
             />
             <span style={{ fontSize: "12px", color: "var(--muted)" }}>
-              Rendered in a 5×5 pixel glyph centered inside the hexagon
+              Rendered in a 3D sculpted ASCII glyph centered inside the hexagon
             </span>
           </div>
         </div>
