@@ -815,7 +815,7 @@ input:disabled {
   min-width: 0;
 }
 /* Range must be a real flex item, not width:100% (which collapses to ~0 when
-   the row is space-constrained, e.g. 3+ stops adding the remove button —
+   the row is space-constrained, e.g. 3+ stops adding the remove button;
    a 0-width track makes every click read as the minimum value). */
 .sliders label input[type="range"] {
   flex: 1 1 auto;

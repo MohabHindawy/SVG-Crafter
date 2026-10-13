@@ -466,7 +466,7 @@ const EFFECT_META = [
   {
     id: "lightning",
     label: "Lightning",
-    desc: "Zigzag bolts flicker along the banner edges",
+    desc: "Lightning bolts flash along the border.",
     controls: [
       { key: "bolts", label: "Bolts", type: "int", min: 1, max: 6, step: 1 },
       {
@@ -483,7 +483,7 @@ const EFFECT_META = [
   {
     id: "soundwaves",
     label: "Sound Waves",
-    desc: "Sine waves ripple horizontally across the banner",
+    desc: "Sine waves ripple across the banner.",
     controls: [
       { key: "count", label: "Waves", type: "int", min: 1, max: 8, step: 1 },
       {
@@ -500,7 +500,7 @@ const EFFECT_META = [
   {
     id: "particles",
     label: "Particles",
-    desc: "Glowing sparks drift upward and fade out",
+    desc: "Tiny sparks float upward and fade out.",
     controls: [
       { key: "count", label: "Count", type: "int", min: 3, max: 40, step: 1 },
       {
@@ -517,7 +517,7 @@ const EFFECT_META = [
   {
     id: "scanlines",
     label: "Scanlines",
-    desc: "CRT grid with a glowing beam sweeping top to bottom",
+    desc: "Horizontal scanlines with a beam rolling from top to bottom.",
     controls: [
       {
         key: "lineGap",
@@ -542,7 +542,7 @@ const EFFECT_META = [
   {
     id: "shimmer",
     label: "Shimmer",
-    desc: "Diagonal gloss highlight sweeps across the banner",
+    desc: "A glossy light sweeps diagonally across the banner.",
     controls: [
       {
         key: "beamWidth",
@@ -558,7 +558,7 @@ const EFFECT_META = [
   {
     id: "pulserings",
     label: "Pulse Rings",
-    desc: "Rings expand outward from the center and fade",
+    desc: "Rings pulse outward from the center.",
     controls: [
       { key: "count", label: "Rings", type: "int", min: 1, max: 8, step: 1 },
       {
@@ -575,7 +575,7 @@ const EFFECT_META = [
   {
     id: "matrixrain",
     label: "Matrix Rain",
-    desc: "Columns of glowing dots rain downward",
+    desc: "Columns of code-style dots fall down the banner.",
     controls: [
       {
         key: "columns",
@@ -599,7 +599,7 @@ const EFFECT_META = [
   {
     id: "borderbeam",
     label: "Border Beam",
-    desc: "Glowing comets orbit around the banner's border",
+    desc: "Light trails travel around the border.",
     controls: [
       { key: "count", label: "Comets", type: "int", min: 1, max: 4, step: 1 },
       {
@@ -625,7 +625,7 @@ const EFFECT_META = [
   {
     id: "sparkles",
     label: "Sparkles",
-    desc: "Four-point stars twinkle in and out across the banner",
+    desc: "Stars twinkle and fade across the banner.",
     controls: [
       { key: "count", label: "Count", type: "int", min: 3, max: 30, step: 1 },
       {
@@ -642,7 +642,7 @@ const EFFECT_META = [
   {
     id: "confetti",
     label: "Confetti",
-    desc: "Colourful pieces tumble down, hues derived from your colour",
+    desc: "Pieces of confetti flutter down in matching colors.",
     controls: [
       { key: "count", label: "Count", type: "int", min: 5, max: 40, step: 1 },
       {
@@ -659,7 +659,7 @@ const EFFECT_META = [
   {
     id: "aurora",
     label: "Aurora",
-    desc: "Soft blurred colour blobs drift slowly behind the text",
+    desc: "Soft color gradients drift behind your text.",
     controls: [
       { key: "blobs", label: "Blobs", type: "int", min: 1, max: 4, step: 1 },
       {
@@ -676,7 +676,7 @@ const EFFECT_META = [
   {
     id: "blurrylights",
     label: "Blurry lights",
-    desc: "Soft out-of-focus orbs drift slowly upward",
+    desc: "Soft bokeh orbs float upward.",
     controls: [
       { key: "count", label: "Orbs", type: "int", min: 3, max: 25, step: 1 },
       {
@@ -693,7 +693,7 @@ const EFFECT_META = [
   {
     id: "synthgrid",
     label: "Synthwave Grid",
-    desc: "Retro 3D wireframe floor scrolls toward the viewer",
+    desc: "A retro wireframe grid rolls forward in perspective.",
     controls: [
       {
         key: "columns",
@@ -709,7 +709,7 @@ const EFFECT_META = [
   {
     id: "starfield",
     label: "Starfield",
-    desc: "Hyperspace streaks shoot from the centre outward",
+    desc: "Star streaks shoot outward from the center.",
     controls: [
       { key: "count", label: "Streaks", type: "int", min: 6, max: 40, step: 1 },
       {
@@ -726,7 +726,7 @@ const EFFECT_META = [
   {
     id: "vignette",
     label: "CRT Vignette",
-    desc: "Edges darken with a subtle CRT flicker — pairs with scanlines",
+    desc: "Darkens the corners with a soft flicker. Works well with scanlines.",
     controls: [
       {
         key: "flicker",
@@ -1119,7 +1119,7 @@ function PaintControl({ label, paint, onChange, disabled }) {
             }}
           />
           <label className="field dir">
-            <span>Direction — {paint.angle}°</span>
+            <span>Direction: {paint.angle}°</span>
             <input
               type="range"
               min="0"
@@ -1192,7 +1192,7 @@ function PaintControl({ label, paint, onChange, disabled }) {
             {paint.anim !== "none" && (
               <>
                 <label className="field">
-                  <span>Animation speed — {paint.animSpeed}</span>
+                  <span>Animation speed: {paint.animSpeed}</span>
                   <input
                     type="range"
                     min="1"
@@ -1343,10 +1343,7 @@ function EffectCard({ meta, eff, onChange }) {
           }
         }}
       >
-        <label
-          className="eff-toggle-row"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <label className="eff-toggle-row" onClick={(e) => e.stopPropagation()}>
           <input
             type="checkbox"
             checked={eff.enabled}
@@ -2145,7 +2142,10 @@ function SvgPreview({ svg, alt }) {
       morphDom(currentSvg, newSvg);
 
       try {
-        if (currentTime > 0 && typeof currentSvg.setCurrentTime === "function") {
+        if (
+          currentTime > 0 &&
+          typeof currentSvg.setCurrentTime === "function"
+        ) {
           currentSvg.setCurrentTime(currentTime);
         }
       } catch {
@@ -2453,19 +2453,19 @@ export default function App() {
         parsed.foreign
           ? {
               kind: "warn",
-              msg: "Imported a non–SVG Crafter file — recovered text and size, everything else uses defaults.",
+              msg: "Imported an external SVG. Recovered the text and size; other settings use defaults.",
             }
           : parsed.legacy
             ? {
                 kind: "ok",
-                msg: "Older SVG Crafter export imported — settings recovered from the artwork; effect fine-tuning and animation speeds use defaults.",
+                msg: "Imported an earlier SVG Crafter file. Recovered settings from the artwork; effect details and speeds use defaults.",
               }
             : isTpl
               ? {
                   kind: "ok",
-                  msg: `${tplName} imported — full settings restored.`,
+                  msg: `${tplName} imported. All settings restored.`,
                 }
-              : { kind: "ok", msg: "Banner imported — full settings restored." },
+              : { kind: "ok", msg: "Banner imported. All settings restored." },
       );
     };
     reader.onerror = () =>
@@ -2523,7 +2523,9 @@ export default function App() {
           <div className="tabpanel">
             {locked && (
               <div className="tpl-lock-note">
-                <span>Cannot edit these options while a template is active.</span>
+                <span>
+                  These settings are locked while a template is active.
+                </span>
                 <button type="button" onClick={() => setTab("templates")}>
                   Edit template
                 </button>
@@ -2540,597 +2542,627 @@ export default function App() {
             ) : (
               <fieldset className="tpl-lock" disabled={locked}>
                 {tab === "text" && (
-              <>
-                <Section
-                  title="Sentences"
-                  defaultOpen
-                  summary={`${config.sentences.filter((s) => s.trim()).length || 1} line${(config.sentences.filter((s) => s.trim()).length || 1) > 1 ? "s" : ""}`}
-                >
-                  <div className="field">
-                    <span>
-                      Sentences
-                      {config.sentences.length > 1 ? " (cycle in order)" : ""}
-                    </span>
-                    <div className="sentences">
-                      {config.sentences.map((s, i) => {
-                        const sid =
-                          (config.sentenceIds && config.sentenceIds[i]) || i;
-                        const multi = config.sentences.length > 1;
-                        const dragOverSentence = () => {
-                          if (dragSentence == null) return;
-                          const from = (config.sentenceIds || []).indexOf(
-                            dragSentence,
-                          );
-                          if (from === -1 || from === i) return;
-                          moveSentence(from, i);
-                        };
-                        return (
-                          <div
-                            className={
-                              "sentence-item" +
-                              (dragSentence === sid ? " dragging" : "")
-                            }
-                            key={sid}
-                            onDragEnter={multi ? dragOverSentence : undefined}
-                            onDragOver={
-                              multi ? (e) => e.preventDefault() : undefined
-                            }
-                            onDrop={
-                              multi ? (e) => e.preventDefault() : undefined
-                            }
-                            onDragEnd={
-                              multi ? () => setDragSentence(null) : undefined
-                            }
-                          >
-                            <div className="sentence-row">
-                              {multi && (
-                                <div className="s-reorder">
-                                  <span
-                                    className="grip"
-                                    draggable
-                                    onDragStart={(e) => {
-                                      e.dataTransfer.effectAllowed = "move";
-                                      e.dataTransfer.setData("text/plain", "");
-                                      setDragSentence(sid);
-                                    }}
-                                    role="button"
-                                    aria-label="Drag to reorder sentence"
-                                    title="Drag to reorder"
-                                  >
-                                    ⠿
-                                  </span>
-                                  <div className="s-arrows">
-                                    <button
-                                      type="button"
-                                      onClick={() => moveSentence(i, i - 1)}
-                                      disabled={i === 0}
-                                      aria-label="Move sentence up"
-                                    >
-                                      ▲
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => moveSentence(i, i + 1)}
-                                      disabled={
-                                        i === config.sentences.length - 1
-                                      }
-                                      aria-label="Move sentence down"
-                                    >
-                                      ▼
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                              <input
-                                type="text"
-                                value={s}
-                                onChange={(e) => setSentence(i, e.target.value)}
-                                maxLength={40}
-                                placeholder={`Sentence ${i + 1}`}
-                              />
-                              {multi && (
-                                <button
-                                  type="button"
-                                  className="remove"
-                                  onClick={() => removeSentence(i)}
-                                  aria-label="Remove sentence"
-                                >
-                                  ✕
-                                </button>
-                              )}
-                            </div>
-                            <div
-                              className="seg align-seg"
-                              role="group"
-                              aria-label="Text alignment"
-                            >
-                              {ALIGNMENTS.map((a) => {
-                                const on =
-                                  (config.sentenceAligns[i] || "left") === a.id;
-                                return (
-                                  <button
-                                    key={a.id}
-                                    type="button"
-                                    className={on ? "on" : ""}
-                                    onClick={() => setSentenceAlign(i, a.id)}
-                                    title={a.label}
-                                    aria-label={a.label}
-                                    aria-pressed={on}
-                                  >
-                                    <AlignIcon type={a.id} />
-                                  </button>
-                                );
-                              })}
-                            </div>
-                            <div
-                              className="seg motion-seg"
-                              role="group"
-                              aria-label="Text motion"
-                            >
-                              {MOTIONS.map((mm) => {
-                                const on =
-                                  ((config.sentenceMotions &&
-                                    config.sentenceMotions[i]) ||
-                                    "none") === mm.id;
-                                return (
-                                  <button
-                                    key={mm.id}
-                                    type="button"
-                                    className={on ? "on" : ""}
-                                    onClick={() => setSentenceMotion(i, mm.id)}
-                                    title={mm.label}
-                                    aria-label={mm.label}
-                                    aria-pressed={on}
-                                  >
-                                    <MotionIcon type={mm.id} />
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <button
-                      type="button"
-                      className="add"
-                      onClick={addSentence}
-                      disabled={config.sentences.length >= MAX_SENTENCES}
+                  <>
+                    <Section
+                      title="Sentences"
+                      defaultOpen
+                      summary={`${config.sentences.filter((s) => s.trim()).length || 1} line${(config.sentences.filter((s) => s.trim()).length || 1) > 1 ? "s" : ""}`}
                     >
-                      + Add sentence
-                    </button>
-                  </div>
-                </Section>
-
-                <Section
-                  title="Text style"
-                  summary={`${config.fontSize}px${config.embedFont ? " · " + config.embedFont.family : config.googleFont ? " · " + config.googleFont : ""}`}
-                >
-                  <PaintControl
-                    label="Text colour"
-                    paint={config.textPaint}
-                    onChange={setPaint("textPaint")}
-                  />
-
-                  <div className="field">
-                    <span>Font</span>
-                    <div className="font-grid">
-                      {FONTS.map((f) => (
+                      <div className="field">
+                        <span>
+                          Sentences
+                          {config.sentences.length > 1
+                            ? " (cycle in order)"
+                            : ""}
+                        </span>
+                        <div className="sentences">
+                          {config.sentences.map((s, i) => {
+                            const sid =
+                              (config.sentenceIds && config.sentenceIds[i]) ||
+                              i;
+                            const multi = config.sentences.length > 1;
+                            const dragOverSentence = () => {
+                              if (dragSentence == null) return;
+                              const from = (config.sentenceIds || []).indexOf(
+                                dragSentence,
+                              );
+                              if (from === -1 || from === i) return;
+                              moveSentence(from, i);
+                            };
+                            return (
+                              <div
+                                className={
+                                  "sentence-item" +
+                                  (dragSentence === sid ? " dragging" : "")
+                                }
+                                key={sid}
+                                onDragEnter={
+                                  multi ? dragOverSentence : undefined
+                                }
+                                onDragOver={
+                                  multi ? (e) => e.preventDefault() : undefined
+                                }
+                                onDrop={
+                                  multi ? (e) => e.preventDefault() : undefined
+                                }
+                                onDragEnd={
+                                  multi
+                                    ? () => setDragSentence(null)
+                                    : undefined
+                                }
+                              >
+                                <div className="sentence-row">
+                                  {multi && (
+                                    <div className="s-reorder">
+                                      <span
+                                        className="grip"
+                                        draggable
+                                        onDragStart={(e) => {
+                                          e.dataTransfer.effectAllowed = "move";
+                                          e.dataTransfer.setData(
+                                            "text/plain",
+                                            "",
+                                          );
+                                          setDragSentence(sid);
+                                        }}
+                                        role="button"
+                                        aria-label="Drag to reorder sentence"
+                                        title="Drag to reorder"
+                                      >
+                                        ⠿
+                                      </span>
+                                      <div className="s-arrows">
+                                        <button
+                                          type="button"
+                                          onClick={() => moveSentence(i, i - 1)}
+                                          disabled={i === 0}
+                                          aria-label="Move sentence up"
+                                        >
+                                          ▲
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => moveSentence(i, i + 1)}
+                                          disabled={
+                                            i === config.sentences.length - 1
+                                          }
+                                          aria-label="Move sentence down"
+                                        >
+                                          ▼
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                  <input
+                                    type="text"
+                                    value={s}
+                                    onChange={(e) =>
+                                      setSentence(i, e.target.value)
+                                    }
+                                    maxLength={40}
+                                    placeholder={`Sentence ${i + 1}`}
+                                  />
+                                  {multi && (
+                                    <button
+                                      type="button"
+                                      className="remove"
+                                      onClick={() => removeSentence(i)}
+                                      aria-label="Remove sentence"
+                                    >
+                                      ✕
+                                    </button>
+                                  )}
+                                </div>
+                                <div
+                                  className="seg align-seg"
+                                  role="group"
+                                  aria-label="Text alignment"
+                                >
+                                  {ALIGNMENTS.map((a) => {
+                                    const on =
+                                      (config.sentenceAligns[i] || "left") ===
+                                      a.id;
+                                    return (
+                                      <button
+                                        key={a.id}
+                                        type="button"
+                                        className={on ? "on" : ""}
+                                        onClick={() =>
+                                          setSentenceAlign(i, a.id)
+                                        }
+                                        title={a.label}
+                                        aria-label={a.label}
+                                        aria-pressed={on}
+                                      >
+                                        <AlignIcon type={a.id} />
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                <div
+                                  className="seg motion-seg"
+                                  role="group"
+                                  aria-label="Text motion"
+                                >
+                                  {MOTIONS.map((mm) => {
+                                    const on =
+                                      ((config.sentenceMotions &&
+                                        config.sentenceMotions[i]) ||
+                                        "none") === mm.id;
+                                    return (
+                                      <button
+                                        key={mm.id}
+                                        type="button"
+                                        className={on ? "on" : ""}
+                                        onClick={() =>
+                                          setSentenceMotion(i, mm.id)
+                                        }
+                                        title={mm.label}
+                                        aria-label={mm.label}
+                                        aria-pressed={on}
+                                      >
+                                        <MotionIcon type={mm.id} />
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                         <button
-                          key={f.id}
                           type="button"
-                          className={
-                            "font-chip" +
-                            (!config.embedFont &&
-                            !config.googleFont &&
-                            config.fontId === f.id
-                              ? " on"
-                              : "")
-                          }
-                          style={{ fontFamily: f.stack }}
-                          onClick={() => selectFont(f.id)}
+                          className="add"
+                          onClick={addSentence}
+                          disabled={config.sentences.length >= MAX_SENTENCES}
                         >
-                          {f.label}
-                        </button>
-                      ))}
-                      {GOOGLE_FONTS.map((name) => (
-                        <button
-                          key={name}
-                          type="button"
-                          className={
-                            "font-chip" +
-                            (config.googleFont === name ? " on" : "")
-                          }
-                          style={
-                            config.embedFont && config.embedFont.family === name
-                              ? { fontFamily: `'${name}'` }
-                              : undefined
-                          }
-                          onClick={() => selectGoogleFont(name)}
-                        >
-                          {name}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="font-search">
-                      <div className="font-load">
-                        <input
-                          type="text"
-                          placeholder="Type any Font name"
-                          value={fontQuery}
-                          autoComplete="off"
-                          role="combobox"
-                          aria-expanded={showSuggest && suggestions.length > 0}
-                          aria-autocomplete="list"
-                          onChange={(e) => {
-                            setFontQuery(e.target.value);
-                            setShowSuggest(true);
-                            setActiveIdx(-1);
-                          }}
-                          onFocus={() => setShowSuggest(true)}
-                          onBlur={() =>
-                            setTimeout(() => setShowSuggest(false), 120)
-                          }
-                          onKeyDown={onFontKeyDown}
-                        />
-                        <button
-                          type="button"
-                          className="ghost"
-                          onClick={() =>
-                            fontQuery.trim() && chooseFont(fontQuery.trim())
-                          }
-                        >
-                          Load
+                          + Add sentence
                         </button>
                       </div>
-                      {showSuggest && suggestions.length > 0 && (
-                        <ul className="suggest" role="listbox">
-                          {suggestions.map((name, i) => (
-                            <li
-                              key={name}
-                              role="option"
-                              aria-selected={i === activeIdx}
+                    </Section>
+
+                    <Section
+                      title="Text style"
+                      summary={`${config.fontSize}px${config.embedFont ? " · " + config.embedFont.family : config.googleFont ? " · " + config.googleFont : ""}`}
+                    >
+                      <PaintControl
+                        label="Text colour"
+                        paint={config.textPaint}
+                        onChange={setPaint("textPaint")}
+                      />
+
+                      <div className="field">
+                        <span>Font</span>
+                        <div className="font-grid">
+                          {FONTS.map((f) => (
+                            <button
+                              key={f.id}
+                              type="button"
                               className={
-                                "suggest-item" +
-                                (i === activeIdx ? " active" : "")
+                                "font-chip" +
+                                (!config.embedFont &&
+                                !config.googleFont &&
+                                config.fontId === f.id
+                                  ? " on"
+                                  : "")
                               }
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                chooseFont(name);
-                              }}
-                              onMouseEnter={() => setActiveIdx(i)}
+                              style={{ fontFamily: f.stack }}
+                              onClick={() => selectFont(f.id)}
                             >
-                              {highlightMatch(name, fontQuery)}
-                            </li>
+                              {f.label}
+                            </button>
                           ))}
-                        </ul>
-                      )}
-                    </div>
-                    {fontStatus.state === "loading" && (
-                      <p className="font-note">{fontStatus.msg}</p>
-                    )}
-                    {fontStatus.state === "error" && (
-                      <p className="font-note error">{fontStatus.msg}</p>
-                    )}
-                    {config.embedFont && fontStatus.state !== "loading" && (
-                      <p className="font-note">
-                        Using <b>{config.embedFont.family}</b> ·{" "}
-                        <button
-                          type="button"
-                          className="linkish"
-                          onClick={removeFont}
-                        >
-                          remove
-                        </button>
-                      </p>
-                    )}
-                  </div>
+                          {GOOGLE_FONTS.map((name) => (
+                            <button
+                              key={name}
+                              type="button"
+                              className={
+                                "font-chip" +
+                                (config.googleFont === name ? " on" : "")
+                              }
+                              style={
+                                config.embedFont &&
+                                config.embedFont.family === name
+                                  ? { fontFamily: `'${name}'` }
+                                  : undefined
+                              }
+                              onClick={() => selectGoogleFont(name)}
+                            >
+                              {name}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="font-search">
+                          <div className="font-load">
+                            <input
+                              type="text"
+                              placeholder="Type any Font name"
+                              value={fontQuery}
+                              autoComplete="off"
+                              role="combobox"
+                              aria-expanded={
+                                showSuggest && suggestions.length > 0
+                              }
+                              aria-autocomplete="list"
+                              onChange={(e) => {
+                                setFontQuery(e.target.value);
+                                setShowSuggest(true);
+                                setActiveIdx(-1);
+                              }}
+                              onFocus={() => setShowSuggest(true)}
+                              onBlur={() =>
+                                setTimeout(() => setShowSuggest(false), 120)
+                              }
+                              onKeyDown={onFontKeyDown}
+                            />
+                            <button
+                              type="button"
+                              className="ghost"
+                              onClick={() =>
+                                fontQuery.trim() && chooseFont(fontQuery.trim())
+                              }
+                            >
+                              Load
+                            </button>
+                          </div>
+                          {showSuggest && suggestions.length > 0 && (
+                            <ul className="suggest" role="listbox">
+                              {suggestions.map((name, i) => (
+                                <li
+                                  key={name}
+                                  role="option"
+                                  aria-selected={i === activeIdx}
+                                  className={
+                                    "suggest-item" +
+                                    (i === activeIdx ? " active" : "")
+                                  }
+                                  onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    chooseFont(name);
+                                  }}
+                                  onMouseEnter={() => setActiveIdx(i)}
+                                >
+                                  {highlightMatch(name, fontQuery)}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                        {fontStatus.state === "loading" && (
+                          <p className="font-note">{fontStatus.msg}</p>
+                        )}
+                        {fontStatus.state === "error" && (
+                          <p className="font-note error">{fontStatus.msg}</p>
+                        )}
+                        {config.embedFont && fontStatus.state !== "loading" && (
+                          <p className="font-note">
+                            Using <b>{config.embedFont.family}</b> ·{" "}
+                            <button
+                              type="button"
+                              className="linkish"
+                              onClick={removeFont}
+                            >
+                              remove
+                            </button>
+                          </p>
+                        )}
+                      </div>
 
-                  <label className="field">
-                    <span>Font size — {config.fontSize}px</span>
-                    <input
-                      type="range"
-                      min="20"
-                      max="72"
-                      value={config.fontSize}
-                      onChange={set("fontSize")}
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Font weight — {config.fontWeight}</span>
-                    <input
-                      type="range"
-                      min="400"
-                      max="800"
-                      step="100"
-                      value={config.fontWeight}
-                      onChange={set("fontWeight")}
-                    />
-                  </label>
-                  <label className="toggle">
-                    <input
-                      type="checkbox"
-                      checked={config.glow}
-                      onChange={set("glow")}
-                    />
-                    <span>Text glow</span>
-                  </label>
-                </Section>
-
-                <Section
-                  title="Animation"
-                  summary={
-                    TRANSITIONS.find((t) => t.id === config.transition)
-                      ?.label || "None"
-                  }
-                >
-                  {(config.sentenceMotions || []).some(
-                    (mm) => mm && mm !== "none",
-                  ) && (
-                    <label className="field">
-                      <span>Motion speed — {config.motionSpeed}x</span>
-                      <input
-                        type="range"
-                        min="0.25"
-                        max="3"
-                        step="0.25"
-                        value={config.motionSpeed}
-                        onChange={set("motionSpeed")}
-                      />
-                    </label>
-                  )}
-                  <div className="field">
-                    <span>
-                      Transition
-                      {config.sentences.length > 1
-                        ? ""
-                        : " (single sentence — needs 2+ to cycle)"}
-                    </span>
-                    <div className="font-grid">
-                      {TRANSITIONS.map((t) => (
-                        <button
-                          key={t.id}
-                          type="button"
-                          className={
-                            "font-chip" +
-                            (config.transition === t.id ? " on" : "")
-                          }
-                          onClick={() =>
-                            setConfig((c) => ({ ...c, transition: t.id }))
-                          }
-                        >
-                          {t.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {(config.sentences.length > 1 ||
-                    config.transition === "typing") && (
-                    <label className="field">
-                      <span>Hold time — {config.holdDuration}s</span>
-                      <input
-                        type="range"
-                        min="0.5"
-                        max="5"
-                        step="0.5"
-                        value={config.holdDuration}
-                        onChange={set("holdDuration")}
-                      />
-                    </label>
-                  )}
-
-                  {config.transition !== "none" &&
-                    config.transition !== "typing" &&
-                    config.sentences.length > 1 && (
                       <label className="field">
-                        <span>
-                          Transition speed — {config.transitionDuration}s
-                        </span>
+                        <span>Font size: {config.fontSize}px</span>
                         <input
                           type="range"
-                          min="0.2"
-                          max="1.5"
-                          step="0.1"
-                          value={config.transitionDuration}
-                          onChange={set("transitionDuration")}
+                          min="20"
+                          max="72"
+                          value={config.fontSize}
+                          onChange={set("fontSize")}
                         />
                       </label>
-                    )}
-
-                  {config.transition === "typing" && (
-                    <div className="subgroup">
-                      <div className="field">
-                        <span>Typing style</span>
-                        <div className="seg">
-                          <button
-                            type="button"
-                            className={
-                              config.typingMode === "smooth" ? "on" : ""
-                            }
-                            onClick={() =>
-                              setConfig((c) => ({ ...c, typingMode: "smooth" }))
-                            }
-                          >
-                            Smooth
-                          </button>
-                          <button
-                            type="button"
-                            className={config.typingMode === "char" ? "on" : ""}
-                            onClick={() =>
-                              setConfig((c) => ({ ...c, typingMode: "char" }))
-                            }
-                          >
-                            Letter by letter
-                          </button>
-                        </div>
-                      </div>
+                      <label className="field">
+                        <span>Font weight: {config.fontWeight}</span>
+                        <input
+                          type="range"
+                          min="400"
+                          max="800"
+                          step="100"
+                          value={config.fontWeight}
+                          onChange={set("fontWeight")}
+                        />
+                      </label>
                       <label className="toggle">
                         <input
                           type="checkbox"
-                          checked={config.cursor}
-                          onChange={set("cursor")}
+                          checked={config.glow}
+                          onChange={set("glow")}
                         />
-                        <span>Show cursor</span>
+                        <span>Text glow</span>
                       </label>
+                    </Section>
+
+                    <Section
+                      title="Animation"
+                      summary={
+                        TRANSITIONS.find((t) => t.id === config.transition)
+                          ?.label || "None"
+                      }
+                    >
+                      {(config.sentenceMotions || []).some(
+                        (mm) => mm && mm !== "none",
+                      ) && (
+                        <label className="field">
+                          <span>Motion speed: {config.motionSpeed}x</span>
+                          <input
+                            type="range"
+                            min="0.25"
+                            max="3"
+                            step="0.25"
+                            value={config.motionSpeed}
+                            onChange={set("motionSpeed")}
+                          />
+                        </label>
+                      )}
+                      <div className="field">
+                        <span>
+                          Transition
+                          {config.sentences.length > 1
+                            ? ""
+                            : " (add 2 or more sentences to cycle)"}
+                        </span>
+                        <div className="font-grid">
+                          {TRANSITIONS.map((t) => (
+                            <button
+                              key={t.id}
+                              type="button"
+                              className={
+                                "font-chip" +
+                                (config.transition === t.id ? " on" : "")
+                              }
+                              onClick={() =>
+                                setConfig((c) => ({ ...c, transition: t.id }))
+                              }
+                            >
+                              {t.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {(config.sentences.length > 1 ||
+                        config.transition === "typing") && (
+                        <label className="field">
+                          <span>Hold time: {config.holdDuration}s</span>
+                          <input
+                            type="range"
+                            min="0.5"
+                            max="5"
+                            step="0.5"
+                            value={config.holdDuration}
+                            onChange={set("holdDuration")}
+                          />
+                        </label>
+                      )}
+
+                      {config.transition !== "none" &&
+                        config.transition !== "typing" &&
+                        config.sentences.length > 1 && (
+                          <label className="field">
+                            <span>
+                              Transition speed: {config.transitionDuration}s
+                            </span>
+                            <input
+                              type="range"
+                              min="0.2"
+                              max="1.5"
+                              step="0.1"
+                              value={config.transitionDuration}
+                              onChange={set("transitionDuration")}
+                            />
+                          </label>
+                        )}
+
+                      {config.transition === "typing" && (
+                        <div className="subgroup">
+                          <div className="field">
+                            <span>Typing style</span>
+                            <div className="seg">
+                              <button
+                                type="button"
+                                className={
+                                  config.typingMode === "smooth" ? "on" : ""
+                                }
+                                onClick={() =>
+                                  setConfig((c) => ({
+                                    ...c,
+                                    typingMode: "smooth",
+                                  }))
+                                }
+                              >
+                                Smooth
+                              </button>
+                              <button
+                                type="button"
+                                className={
+                                  config.typingMode === "char" ? "on" : ""
+                                }
+                                onClick={() =>
+                                  setConfig((c) => ({
+                                    ...c,
+                                    typingMode: "char",
+                                  }))
+                                }
+                              >
+                                Letter by letter
+                              </button>
+                            </div>
+                          </div>
+                          <label className="toggle">
+                            <input
+                              type="checkbox"
+                              checked={config.cursor}
+                              onChange={set("cursor")}
+                            />
+                            <span>Show cursor</span>
+                          </label>
+                          <label className="field">
+                            <span>Typing speed: {config.typingSpeed}x</span>
+                            <input
+                              type="range"
+                              min="0.5"
+                              max="4"
+                              step="0.5"
+                              value={config.typingSpeed}
+                              onChange={set("typingSpeed")}
+                            />
+                          </label>
+                        </div>
+                      )}
+                    </Section>
+                  </>
+                )}
+
+                {(tab === "border-background" ||
+                  tab === "border" ||
+                  tab === "background") && (
+                  <>
+                    <Section
+                      title="Border"
+                      defaultOpen
+                      summary={
+                        config.border ? `on · ${config.borderWidth}px` : "off"
+                      }
+                    >
+                      <label className="toggle">
+                        <input
+                          type="checkbox"
+                          checked={config.border}
+                          onChange={set("border")}
+                        />
+                        <span>Show border</span>
+                      </label>
+                      <PaintControl
+                        label="Border colour"
+                        paint={config.borderPaint}
+                        onChange={setPaint("borderPaint")}
+                        disabled={!config.border}
+                      />
                       <label className="field">
-                        <span>Typing speed — {config.typingSpeed}x</span>
+                        <span>Border width: {config.borderWidth}px</span>
                         <input
                           type="range"
-                          min="0.5"
-                          max="4"
-                          step="0.5"
-                          value={config.typingSpeed}
-                          onChange={set("typingSpeed")}
+                          min="1"
+                          max="10"
+                          value={config.borderWidth}
+                          onChange={set("borderWidth")}
+                          disabled={!config.border}
                         />
                       </label>
-                    </div>
-                  )}
-                </Section>
-              </>
-            )}
+                    </Section>
+                    <Section
+                      title="Corners"
+                      defaultOpen
+                      summary={`${config.borderRadius}px radius`}
+                    >
+                      <label className="field">
+                        <span>Corner radius: {config.borderRadius}px</span>
+                        <input
+                          type="range"
+                          min="0"
+                          max="40"
+                          value={config.borderRadius}
+                          onChange={set("borderRadius")}
+                        />
+                      </label>
+                    </Section>
+                    <Section
+                      title="Dimensions"
+                      defaultOpen
+                      summary={`${config.autoWidth ? "auto" : config.bannerWidth} × ${config.autoHeight ? "auto" : config.bannerHeight}`}
+                    >
+                      <div className="field">
+                        <span>Width</span>
+                        <div className="seg">
+                          <button
+                            type="button"
+                            className={config.autoWidth ? "on" : ""}
+                            onClick={() => setWidthAuto(true)}
+                          >
+                            Fit text
+                          </button>
+                          <button
+                            type="button"
+                            className={!config.autoWidth ? "on" : ""}
+                            onClick={() => setWidthAuto(false)}
+                          >
+                            Custom
+                          </button>
+                        </div>
+                      </div>
+                      {!config.autoWidth && (
+                        <label className="field">
+                          <span>Banner width: {config.bannerWidth}px</span>
+                          <input
+                            type="range"
+                            min="200"
+                            max="1000"
+                            step="10"
+                            value={config.bannerWidth}
+                            onChange={set("bannerWidth")}
+                          />
+                        </label>
+                      )}
 
-            {(tab === "border-background" ||
-              tab === "border" ||
-              tab === "background") && (
-              <>
-                <Section
-                  title="Border"
-                  defaultOpen
-                  summary={
-                    config.border ? `on · ${config.borderWidth}px` : "off"
-                  }
-                >
-                  <label className="toggle">
-                    <input
-                      type="checkbox"
-                      checked={config.border}
-                      onChange={set("border")}
-                    />
-                    <span>Show border</span>
-                  </label>
-                  <PaintControl
-                    label="Border colour"
-                    paint={config.borderPaint}
-                    onChange={setPaint("borderPaint")}
-                    disabled={!config.border}
-                  />
-                  <label className="field">
-                    <span>Border width — {config.borderWidth}px</span>
-                    <input
-                      type="range"
-                      min="1"
-                      max="10"
-                      value={config.borderWidth}
-                      onChange={set("borderWidth")}
-                      disabled={!config.border}
-                    />
-                  </label>
-                </Section>
-                <Section
-                  title="Corners"
-                  defaultOpen
-                  summary={`${config.borderRadius}px radius`}
-                >
-                  <label className="field">
-                    <span>Corner radius — {config.borderRadius}px</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="40"
-                      value={config.borderRadius}
-                      onChange={set("borderRadius")}
-                    />
-                  </label>
-                </Section>
-                <Section
-                  title="Dimensions"
-                  defaultOpen
-                  summary={`${config.autoWidth ? "auto" : config.bannerWidth} × ${config.autoHeight ? "auto" : config.bannerHeight}`}
-                >
-                  <div className="field">
-                    <span>Width</span>
-                    <div className="seg">
-                      <button
-                        type="button"
-                        className={config.autoWidth ? "on" : ""}
-                        onClick={() => setWidthAuto(true)}
-                      >
-                        Fit text
-                      </button>
-                      <button
-                        type="button"
-                        className={!config.autoWidth ? "on" : ""}
-                        onClick={() => setWidthAuto(false)}
-                      >
-                        Custom
-                      </button>
-                    </div>
-                  </div>
-                  {!config.autoWidth && (
-                    <label className="field">
-                      <span>Banner width — {config.bannerWidth}px</span>
-                      <input
-                        type="range"
-                        min="200"
-                        max="1000"
-                        step="10"
-                        value={config.bannerWidth}
-                        onChange={set("bannerWidth")}
+                      <div className="field">
+                        <span>Height</span>
+                        <div className="seg">
+                          <button
+                            type="button"
+                            className={config.autoHeight ? "on" : ""}
+                            onClick={() => setHeightAuto(true)}
+                          >
+                            Fit text
+                          </button>
+                          <button
+                            type="button"
+                            className={!config.autoHeight ? "on" : ""}
+                            onClick={() => setHeightAuto(false)}
+                          >
+                            Custom
+                          </button>
+                        </div>
+                      </div>
+                      {!config.autoHeight && (
+                        <label className="field">
+                          <span>Banner height: {config.bannerHeight}px</span>
+                          <input
+                            type="range"
+                            min="60"
+                            max="400"
+                            step="10"
+                            value={config.bannerHeight}
+                            onChange={set("bannerHeight")}
+                          />
+                        </label>
+                      )}
+                    </Section>
+
+                    <Section title="Fill" defaultOpen>
+                      <PaintControl
+                        label="Background"
+                        paint={config.bgPaint}
+                        onChange={setPaint("bgPaint")}
                       />
-                    </label>
-                  )}
+                    </Section>
+                  </>
+                )}
 
-                  <div className="field">
-                    <span>Height</span>
-                    <div className="seg">
-                      <button
-                        type="button"
-                        className={config.autoHeight ? "on" : ""}
-                        onClick={() => setHeightAuto(true)}
-                      >
-                        Fit text
-                      </button>
-                      <button
-                        type="button"
-                        className={!config.autoHeight ? "on" : ""}
-                        onClick={() => setHeightAuto(false)}
-                      >
-                        Custom
-                      </button>
-                    </div>
-                  </div>
-                  {!config.autoHeight && (
-                    <label className="field">
-                      <span>Banner height — {config.bannerHeight}px</span>
-                      <input
-                        type="range"
-                        min="60"
-                        max="400"
-                        step="10"
-                        value={config.bannerHeight}
-                        onChange={set("bannerHeight")}
-                      />
-                    </label>
-                  )}
-                </Section>
-
-                <Section title="Fill" defaultOpen>
-                  <PaintControl
-                    label="Background"
-                    paint={config.bgPaint}
-                    onChange={setPaint("bgPaint")}
+                {tab === "effects" && (
+                  <EffectsTab
+                    effects={config.effects}
+                    onChange={(effects) =>
+                      setConfig((c) => ({ ...c, effects }))
+                    }
                   />
-                </Section>
-              </>
-            )}
-
-            {tab === "effects" && (
-              <EffectsTab
-                effects={config.effects}
-                onChange={(effects) => setConfig((c) => ({ ...c, effects }))}
-              />
-            )}
+                )}
               </fieldset>
             )}
           </div>
@@ -3225,22 +3257,21 @@ export default function App() {
             <div className="guide">
               <h3>How to use</h3>
               <ol>
-                <li>Customise your banner with the panel on the left.</li>
+                <li>Customize your banner using the sidebar controls.</li>
                 <li>
-                  Hit <b>Download .svg</b>, or <b>Copy SVG</b> to grab the
-                  markup.
+                  Click <b>Download .svg</b> to save the file, or{" "}
+                  <b>Copy SVG</b> to copy the code.
                 </li>
                 <li>
-                  Add the file to an <code>assets</code> folder in your profile
-                  repo.
+                  Commit the file to an <code>assets</code> folder in your
+                  profile repository.
                 </li>
                 <li>
                   Paste the snippet above into your <code>README.md</code>.
                 </li>
                 {link && (
                   <li>
-                    The snippet wraps the image in your link, so clicking the
-                    banner on GitHub opens <code>{link}</code>.
+                    Clicking the banner will open <code>{link}</code>.
                   </li>
                 )}
               </ol>

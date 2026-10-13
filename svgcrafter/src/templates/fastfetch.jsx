@@ -66,7 +66,6 @@ const EMPTY_HEX_ROWS = LOGO_CHARS.map((chars, r) => {
   };
 });
 
-
 // Built-in 5x5 pixel font for procedural 3D extrusion of remaining characters
 const GLYPHS_5X5 = {
   A: [".###.", "#...#", "#####", "#...#", "#...#"],
@@ -111,10 +110,25 @@ const GLYPHS_5X5 = {
 // horizontal arc of the sphere (so strokes bend and darken toward the edge), and every cell is
 // anti-aliased into a density ramp so edges ease into the background. Constants were fitted so the
 // "M" matches the reference artwork. Tiers: 3 letter, 2 background (dim halo / shadow).
-const GLOBE = { r: 175.88, shift: -3.98, lean: 0.329, px: 17.05, sharp: 2.28, limb: 1.306 };
+const GLOBE = {
+  r: 175.88,
+  shift: -3.98,
+  lean: 0.329,
+  px: 17.05,
+  sharp: 2.28,
+  limb: 1.306,
+};
 const INK = { gamma: 0.504, topLight: 0.049 };
 const HALO = { left: 0.091, right: 1.142, up: 0.054, down: 0.587, gain: 0.843 };
-const RAMP = [[0.9, "Q"], [0.7, "0"], [0.55, "O"], [0.4, "o"], [0.3, "~"], [0.18, ":"], [0.08, "."]];
+const RAMP = [
+  [0.9, "Q"],
+  [0.7, "0"],
+  [0.55, "O"],
+  [0.4, "o"],
+  [0.3, "~"],
+  [0.18, ":"],
+  [0.08, "."],
+];
 const CELL_W = 8.4;
 const CELL_H = 19;
 const SAMPLES = 9;
@@ -132,7 +146,10 @@ function get3dGlyph(char) {
     return Array.from({ length: 13 }, (_, c) => {
       let sum = 0;
       for (let i = 0; i < SAMPLES; i++) {
-        const ex = c * CELL_W + ((i + 0.5) / SAMPLES) * CELL_W - (6.5 * CELL_W + GLOBE.shift);
+        const ex =
+          c * CELL_W +
+          ((i + 0.5) / SAMPLES) * CELL_W -
+          (6.5 * CELL_W + GLOBE.shift);
         const arg = ex / (GLOBE.r * cosLat);
         if (Math.abs(arg) >= 0.999) continue;
         const s = GLOBE.r * Math.asin(arg) + GLOBE.lean * (r - 2) * CELL_W;
@@ -141,7 +158,9 @@ function get3dGlyph(char) {
         const t = fx - x0;
         const b = pix(x0) * (1 - t) + pix(x0 + 1) * t;
         const cover = clamp((b - 0.5) * GLOBE.sharp + 0.5, 0, 1);
-        const facing = Math.sqrt(Math.max(0, 1 - (ex * ex + ey * ey) / GLOBE.r ** 2));
+        const facing = Math.sqrt(
+          Math.max(0, 1 - (ex * ex + ey * ey) / GLOBE.r ** 2),
+        );
         sum += cover * facing ** GLOBE.limb;
       }
       return (sum / SAMPLES) * (1 - INK.topLight * (r / 4));
@@ -157,7 +176,11 @@ function get3dGlyph(char) {
     for (let c = 0; c < 13; c++) {
       const body = rampChar(Math.pow(ink[r][c], INK.gamma));
       const halo = rampChar(
-        HALO.gain * (HALO.left * at(r, c + 1) + HALO.right * at(r, c - 1) + HALO.up * at(r + 1, c) + HALO.down * at(r - 1, c)),
+        HALO.gain *
+          (HALO.left * at(r, c + 1) +
+            HALO.right * at(r, c - 1) +
+            HALO.up * at(r + 1, c) +
+            HALO.down * at(r - 1, c)),
       );
       cs += body || halo || "+";
       ts += body ? "3" : "2";
@@ -171,7 +194,10 @@ function get3dGlyph(char) {
 const logoCache = new Map();
 
 function buildLogo(letter = "S") {
-  const norm = String(letter || "S").toUpperCase().trim()[0] || "S";
+  const norm =
+    String(letter || "S")
+      .toUpperCase()
+      .trim()[0] || "S";
   const valid = /^[A-Z0-9]$/.test(norm) ? norm : "S";
   if (logoCache.has(valid)) return logoCache.get(valid);
 
@@ -190,7 +216,6 @@ function buildLogo(letter = "S") {
   logoCache.set(valid, grid);
   return grid;
 }
-
 
 function fromTheme(roles) {
   return {
@@ -253,7 +278,9 @@ function sanitize(raw) {
 
   const terminalName =
     stripControl(
-      typeof raw.terminalName === "string" ? raw.terminalName : def.terminalName,
+      typeof raw.terminalName === "string"
+        ? raw.terminalName
+        : def.terminalName,
     )
       .trim()
       .slice(0, 24) || "Terminal";
@@ -393,7 +420,7 @@ function generate(rawCfg) {
   for (let i = 0; i < 16; i++) {
     const row = logoRows[i];
     const y = 92 + 19 * i;
-    const beginTime = (1.80 + 0.06 * i).toFixed(2) + "s";
+    const beginTime = (1.8 + 0.06 * i).toFixed(2) + "s";
     const textXml = renderLogoRow(row, y, colors);
     if (textXml) {
       xml += `<g opacity="0"><set attributeName="opacity" to="1" begin="${beginTime}" fill="freeze"/>${textXml}</g>`;
@@ -408,13 +435,13 @@ function generate(rawCfg) {
   // Line 0: title
   const titleRow = startRow;
   const titleY = 92 + 19 * titleRow;
-  const titleBegin = (1.80 + 0.06 * titleRow).toFixed(2) + "s";
+  const titleBegin = (1.8 + 0.06 * titleRow).toFixed(2) + "s";
   xml += `<g opacity="0"><set attributeName="opacity" to="1" begin="${titleBegin}" fill="freeze"/><text x="328.8" y="${titleY}" xml:space="preserve" fill="${colors.title}" font-weight="700">${escapeXml(cfg.title)}</text></g>`;
 
   // Line 1: divider dashes
   const divRow = startRow + 1;
   const divY = 92 + 19 * divRow;
-  const divBegin = (1.80 + 0.06 * divRow).toFixed(2) + "s";
+  const divBegin = (1.8 + 0.06 * divRow).toFixed(2) + "s";
   const dashes = "-".repeat(cfg.title ? cfg.title.length : 0);
   xml += `<g opacity="0"><set attributeName="opacity" to="1" begin="${divBegin}" fill="freeze"/><text x="328.8" y="${divY}" xml:space="preserve" fill="${colors.divider}">${dashes}</text></g>`;
 
@@ -422,7 +449,7 @@ function generate(rawCfg) {
   cfg.rows.forEach((r, idx) => {
     const rowIdx = startRow + 2 + idx;
     const y = 92 + 19 * rowIdx;
-    const beginTime = (1.80 + 0.06 * rowIdx).toFixed(2) + "s";
+    const beginTime = (1.8 + 0.06 * rowIdx).toFixed(2) + "s";
 
     let label = r.label.slice(0, 14);
     let value = r.value;
@@ -459,7 +486,9 @@ function Editor({ value, onChange, Section }) {
     });
 
   const setRow = (idx, updates) => {
-    const nextRows = value.rows.map((r, i) => (i === idx ? { ...r, ...updates } : r));
+    const nextRows = value.rows.map((r, i) =>
+      i === idx ? { ...r, ...updates } : r,
+    );
     patch({ rows: nextRows });
   };
 
@@ -512,7 +541,7 @@ function Editor({ value, onChange, Section }) {
           </div>
         </div>
         <label className="field">
-          <span>Tab label — {value.terminalName.length}/24 chars</span>
+          <span>Tab label ({value.terminalName.length}/24 chars)</span>
           <input
             type="text"
             value={value.terminalName}
@@ -523,9 +552,13 @@ function Editor({ value, onChange, Section }) {
         </label>
       </Section>
 
-      <Section title="Logo" defaultOpen summary={`Letter '${value.letter || "S"}'`}>
+      <Section
+        title="Logo"
+        defaultOpen
+        summary={`Letter '${value.letter || "S"}'`}
+      >
         <div className="field">
-          <span>Logo letter (A–Z, 0–9)</span>
+          <span>Logo letter (A-Z, 0-9)</span>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <input
               type="text"
@@ -535,13 +568,19 @@ function Editor({ value, onChange, Section }) {
               onFocus={(e) => e.target.select()}
               onClick={(e) => e.target.select()}
               onKeyDown={(e) => {
-                if (e.key === "Tab" || e.key === "Escape" || e.key === "Enter") return;
+                if (e.key === "Tab" || e.key === "Escape" || e.key === "Enter")
+                  return;
                 if (e.key === "Backspace" || e.key === "Delete") {
                   e.preventDefault();
                   patch({ letter: "" });
                   return;
                 }
-                if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                if (
+                  e.key.length === 1 &&
+                  !e.ctrlKey &&
+                  !e.metaKey &&
+                  !e.altKey
+                ) {
                   if (/^[a-zA-Z0-9]$/.test(e.key)) {
                     e.preventDefault();
                     patch({ letter: e.key.toUpperCase() });
@@ -560,7 +599,10 @@ function Editor({ value, onChange, Section }) {
                 }
                 let char = upper.slice(-1);
                 if (value.letter && upper.length > 1) {
-                  const withoutOld = upper.replace(value.letter.toUpperCase(), "");
+                  const withoutOld = upper.replace(
+                    value.letter.toUpperCase(),
+                    "",
+                  );
                   if (withoutOld.length > 0) {
                     char = withoutOld[0];
                   }
@@ -582,7 +624,7 @@ function Editor({ value, onChange, Section }) {
               }}
             />
             <span style={{ fontSize: "12px", color: "var(--muted)" }}>
-              Rendered in a 3D sculpted ASCII glyph centered inside the hexagon
+              Centers your letter inside the 3D hexagon logo.
             </span>
           </div>
         </div>
@@ -594,7 +636,7 @@ function Editor({ value, onChange, Section }) {
         summary={`${value.rows.length} row${value.rows.length > 1 ? "s" : ""}`}
       >
         <label className="field">
-          <span>Title line — {value.title.length}/40 chars</span>
+          <span>Title line ({value.title.length}/40 chars)</span>
           <input
             type="text"
             value={value.title}
@@ -606,7 +648,10 @@ function Editor({ value, onChange, Section }) {
 
         <div className="field">
           <span>Info rows ({value.rows.length}/12)</span>
-          <div className="sentences" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <div
+            className="sentences"
+            style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+          >
             {value.rows.map((row, idx) => {
               const totalLen = row.label.length + 2 + row.value.length;
               return (
@@ -620,8 +665,18 @@ function Editor({ value, onChange, Section }) {
                     padding: "8px",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
-                    <div className="s-arrows" style={{ display: "flex", gap: "2px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    <div
+                      className="s-arrows"
+                      style={{ display: "flex", gap: "2px" }}
+                    >
                       <button
                         type="button"
                         onClick={() => moveRow(idx, idx - 1)}
@@ -639,7 +694,13 @@ function Editor({ value, onChange, Section }) {
                         ▼
                       </button>
                     </div>
-                    <span style={{ fontSize: "11px", color: "var(--muted)", flex: 1 }}>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        color: "var(--muted)",
+                        flex: 1,
+                      }}
+                    >
                       Row {idx + 1} &middot; {totalLen}/56 chars
                     </span>
                     <button
@@ -696,7 +757,15 @@ function Editor({ value, onChange, Section }) {
         <ThemePicker value={value.themeId} onPick={onPickTheme} />
 
         <div className="subgroup">
-          <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)", display: "block", marginBottom: "12px" }}>
+          <span
+            style={{
+              fontSize: "12px",
+              fontWeight: 700,
+              color: "var(--muted)",
+              display: "block",
+              marginBottom: "12px",
+            }}
+          >
             Window Chrome
           </span>
           <ColorField
@@ -740,7 +809,15 @@ function Editor({ value, onChange, Section }) {
         </div>
 
         <div className="subgroup">
-          <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)", display: "block", marginBottom: "12px" }}>
+          <span
+            style={{
+              fontSize: "12px",
+              fontWeight: 700,
+              color: "var(--muted)",
+              display: "block",
+              marginBottom: "12px",
+            }}
+          >
             Terminal Prompt
           </span>
           <ColorField
@@ -766,7 +843,15 @@ function Editor({ value, onChange, Section }) {
         </div>
 
         <div className="subgroup">
-          <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)", display: "block", marginBottom: "12px" }}>
+          <span
+            style={{
+              fontSize: "12px",
+              fontWeight: 700,
+              color: "var(--muted)",
+              display: "block",
+              marginBottom: "12px",
+            }}
+          >
             Logo
           </span>
           <ColorField
@@ -787,7 +872,15 @@ function Editor({ value, onChange, Section }) {
         </div>
 
         <div className="subgroup">
-          <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)", display: "block", marginBottom: "12px" }}>
+          <span
+            style={{
+              fontSize: "12px",
+              fontWeight: 700,
+              color: "var(--muted)",
+              display: "block",
+              marginBottom: "12px",
+            }}
+          >
             Info & Text
           </span>
           <ColorField
@@ -824,7 +917,7 @@ function Editor({ value, onChange, Section }) {
 const fastfetch = {
   id: "fastfetch",
   name: "Fastfetch Terminal",
-  desc: "Animated Konsole window running fastfetch",
+  desc: "Terminal window running fastfetch with an animated prompt and ASCII logo",
   defaults,
   sanitize,
   generate,
