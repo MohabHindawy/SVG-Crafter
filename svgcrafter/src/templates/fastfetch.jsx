@@ -227,10 +227,10 @@ function fromTheme(roles) {
     tabAccent: roles.primary,
     tabText: roles.text,
     windowBorder: roles.border,
-    promptPath: roles.bg === "#282a36" ? "#6c8ee0" : roles.primary,
-    promptSymbol: roles.primary,
+    promptPath: roles.promptPath || roles.primary,
+    promptSymbol: roles.promptSymbol || roles.primary,
     command: roles.text,
-    cursor: roles.primary,
+    cursor: roles.cursor || roles.primary,
     logoBase: roles.secondary,
     logoDim: roles.primaryDim,
     logoAccent: roles.primary,
@@ -248,12 +248,12 @@ function defaults() {
   return {
     terminalName: "Konsole",
     letter: "S",
-    title: "Your Name",
+    title: "your@name",
     rows: [
       { id: "row-1", label: "Role", value: "Your title" },
-      { id: "row-2", label: "Focus", value: "What you're building" },
-      { id: "row-3", label: "Editor", value: "Your editor" },
-      { id: "row-4", label: "Status", value: "Something playful" },
+      { id: "row-2", label: "Learning", value: "What you're learning" },
+      { id: "row-3", label: "Building", value: "What you're building" },
+      { id: "row-4", label: "Status", value: "Your status" },
     ],
     themeId: defaultTheme.id,
     colors: fromTheme(defaultTheme.roles),
@@ -393,23 +393,23 @@ function generate(rawCfg) {
 
   const logoRows = buildLogo(cfg.letter);
 
-  let xml = `<svg xmlns="http://www.w3.org/2000/svg" width="840" height="435" viewBox="0 0 840 435" font-family="'Fira Code','JetBrains Mono','DejaVu Sans Mono',monospace" font-size="14" role="img" aria-label="${escapeXml(cfg.terminalName)} terminal running fastfetch">`;
+  let xml = `<svg xmlns="http://www.w3.org/2000/svg" width="840" height="435" viewBox="0 0 840 435" overflow="visible" font-family="'Fira Code','JetBrains Mono','DejaVu Sans Mono',monospace" font-size="14" role="img" aria-label="${escapeXml(cfg.terminalName)} terminal running fastfetch">`;
   xml += `<defs>`;
-  xml += `<clipPath id="win"><rect width="840" height="435" rx="10"/></clipPath>`;
+  xml += `<clipPath id="win"><rect x="1.5" y="1.5" width="837" height="432" rx="10"/></clipPath>`;
   xml += `<clipPath id="ty"><rect x="57.6" y="46" height="22" width="0"><animate attributeName="width" values="0.0;8.4;16.8;25.2;33.6;42.0;50.4;58.8;67.2;75.6" dur="0.81s" begin="0.7s" calcMode="discrete" fill="freeze"/></rect></clipPath>`;
   xml += `</defs>`;
 
   xml += `<g clip-path="url(#win)">`;
-  xml += `<rect width="840" height="435" fill="${colors.bg}"/>`;
-  xml += `<rect width="840" height="30" fill="${colors.titlebar}"/>`;
-  xml += `<rect y="29" width="840" height="1" fill="${colors.titlebarBorder}"/>`;
-  xml += `<path d="M24 15 h10 M29 10 v10" stroke="${colors.chromeIcon}" stroke-width="1.4" stroke-linecap="round"/>`;
-  xml += `<rect x="56" y="0" width="${tabW}" height="30" fill="${colors.tabBg}"/>`;
-  xml += `<rect x="56" y="27.5" width="${tabW}" height="2.5" fill="${colors.tabAccent}"/>`;
-  xml += `<path d="M70 10.5 l4 3.2 -4 3.2" fill="none" stroke="${colors.chromeIcon}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>`;
-  xml += `<path d="M77 17.5 h5" stroke="${colors.chromeIcon}" stroke-width="1.4" stroke-linecap="round"/>`;
-  xml += `<text x="92" y="19.5" xml:space="preserve" fill="${colors.tabText}" font-size="12.5">${escapeXml(cfg.terminalName)}</text>`;
-  xml += `<path d="M${tabRight - 20} 11 l7 7 m0 -7 l-7 7" stroke="${colors.chromeIcon}" stroke-width="1.3" stroke-linecap="round"/>`;
+  xml += `<rect x="1.5" y="1.5" width="837" height="432" fill="${colors.bg}"/>`;
+  xml += `<rect x="1.5" y="1.5" width="837" height="30" fill="${colors.titlebar}"/>`;
+  xml += `<rect x="1.5" y="30.5" width="837" height="1" fill="${colors.titlebarBorder}"/>`;
+  xml += `<path d="M24 16.5 h10 M29 11.5 v10" stroke="${colors.chromeIcon}" stroke-width="1.4" stroke-linecap="round"/>`;
+  xml += `<rect x="56" y="1.5" width="${tabW}" height="30" fill="${colors.tabBg}"/>`;
+  xml += `<rect x="56" y="29" width="${tabW}" height="2.5" fill="${colors.tabAccent}"/>`;
+  xml += `<path d="M70 12 l4 3.2 -4 3.2" fill="none" stroke="${colors.chromeIcon}" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>`;
+  xml += `<path d="M77 19 h5" stroke="${colors.chromeIcon}" stroke-width="1.4" stroke-linecap="round"/>`;
+  xml += `<text x="92" y="21" xml:space="preserve" fill="${colors.tabText}" font-size="12.5">${escapeXml(cfg.terminalName)}</text>`;
+  xml += `<path d="M${tabRight - 20} 12.5 l7 7 m0 -7 l-7 7" stroke="${colors.chromeIcon}" stroke-width="1.3" stroke-linecap="round"/>`;
   xml += `</g>`;
 
   xml += `<text x="24" y="62" xml:space="preserve"><tspan fill="${colors.promptPath}">~</tspan><tspan fill="${colors.promptSymbol}" font-weight="700"> $ </tspan></text>`;
@@ -466,7 +466,7 @@ function generate(rawCfg) {
   xml += `<g opacity="0"><set attributeName="opacity" to="1" begin="2.97s" fill="freeze"/><text x="24" y="409" xml:space="preserve"><tspan fill="${colors.promptPath}">~</tspan><tspan fill="${colors.promptSymbol}" font-weight="700"> $ </tspan></text><rect x="57.6" y="396" width="8.4" height="17" fill="${colors.cursor}"></rect></g>`;
 
   // Outer border
-  xml += `<rect x="0.5" y="0.5" width="839" height="434" rx="10" fill="none" stroke="${colors.windowBorder}" stroke-opacity=".8"/>`;
+  xml += `<rect x="1.5" y="1.5" width="837" height="432" rx="10" fill="none" stroke="${colors.windowBorder}" stroke-width="1.5"/>`;
 
   xml += `</svg>`;
   return xml;
@@ -478,12 +478,13 @@ function alt() {
 
 function Editor({ value, onChange, Section, onReplay }) {
   const patch = (updates) => onChange({ ...value, ...updates });
-  const patchColor = (key, val) =>
+  const patchColors = (updates) =>
     onChange({
       ...value,
       themeId: "custom",
-      colors: { ...value.colors, [key]: val },
+      colors: { ...value.colors, ...updates },
     });
+  const patchColor = (key, val) => patchColors({ [key]: val });
 
   const setRow = (idx, updates) => {
     const nextRows = value.rows.map((r, i) =>
@@ -788,10 +789,7 @@ function Editor({ value, onChange, Section, onReplay }) {
           <ColorField
             label="Window background"
             value={value.colors.bg}
-            onChange={(v) => {
-              patchColor("bg", v);
-              patchColor("tabBg", v);
-            }}
+            onChange={(v) => patchColors({ bg: v, tabBg: v })}
           />
           <ColorField
             label="Window border"

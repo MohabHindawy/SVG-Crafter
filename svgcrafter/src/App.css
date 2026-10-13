@@ -324,6 +324,40 @@ fieldset.tpl-lock:disabled {
   cursor: pointer;
   user-select: none;
 }
+.tpl-body {
+  border-top: 1px solid var(--border);
+}
+.tpl-body .section,
+.template-editor .section {
+  border: none;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  margin-bottom: 0;
+}
+.tpl-body .section:first-child,
+.template-editor .section:first-child {
+  border-top: none;
+}
+.tpl-body .section-open,
+.template-editor .section-open {
+  border-color: var(--border);
+}
+.tpl-body .section-head,
+.template-editor .section-head {
+  padding: 12px 14px;
+  border-radius: 0;
+  background: transparent;
+}
+.tpl-body .section-head:hover,
+.template-editor .section-head:hover {
+  background: var(--check);
+}
+.tpl-body .section-body,
+.template-editor .section-body {
+  padding: 8px 14px 18px;
+  background: transparent;
+}
 
 .tabpanel {
   padding: 20px;
@@ -336,7 +370,6 @@ fieldset.tpl-lock:disabled {
   }
 }
 
-.preview h2,
 .export h2 {
   margin: 0 0 16px;
   font-family: var(--font-display);
@@ -904,12 +937,14 @@ input:disabled {
   max-width: 100%;
   height: auto;
   display: block;
+  overflow: visible;
 }
 .svg-preview-wrap {
   display: flex;
   align-items: center;
   justify-content: center;
   max-width: 100%;
+  overflow: visible;
 }
 
 .actions {

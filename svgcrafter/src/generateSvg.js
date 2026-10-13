@@ -1,5 +1,3 @@
-// SVG output uses CSS and SMIL animations exclusively; inline JS is sanitized by GitHub image proxies.
-
 const FONT_STACK = "'Segoe UI', system-ui, -apple-system, Arial, sans-serif";
 const CHAR_TYPE = 0.13;
 const CHAR_DELETE = 0.07;

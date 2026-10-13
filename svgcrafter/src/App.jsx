@@ -1520,7 +1520,7 @@ function TemplateCard({
       )}
 
       {open && (
-        <div style={{ marginTop: "12px" }}>
+        <div className="tpl-body">
           <tpl.Editor
             value={value}
             onChange={onChange}
@@ -3250,7 +3250,6 @@ export default function App() {
 
         <main className="main">
           <section className="preview">
-            <h2>Preview</h2>
             <div className="stage">
               <SvgPreview svg={svg} alt={alt} resetKey={animNonce} />
             </div>
