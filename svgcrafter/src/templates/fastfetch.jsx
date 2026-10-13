@@ -476,7 +476,7 @@ function alt() {
   return "fastfetch";
 }
 
-function Editor({ value, onChange, Section }) {
+function Editor({ value, onChange, Section, onReplay }) {
   const patch = (updates) => onChange({ ...value, ...updates });
   const patchColor = (key, val) =>
     onChange({
@@ -550,6 +550,23 @@ function Editor({ value, onChange, Section }) {
             placeholder="Tab label"
           />
         </label>
+        {onReplay && (
+          <button
+            type="button"
+            className="ghost"
+            onClick={onReplay}
+            style={{
+              width: "100%",
+              marginTop: "8px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "6px",
+            }}
+          >
+            <span aria-hidden="true">↻</span> Replay animation
+          </button>
+        )}
       </Section>
 
       <Section

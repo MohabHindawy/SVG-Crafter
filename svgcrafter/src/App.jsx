@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   generateSvg,
   adjustBrightness,
@@ -1465,7 +1465,15 @@ function EffectsTab({ effects, onChange }) {
   );
 }
 
-function TemplateCard({ tpl, active, value, onToggle, onChange, Section }) {
+function TemplateCard({
+  tpl,
+  active,
+  value,
+  onToggle,
+  onChange,
+  Section,
+  onReplay,
+}) {
   const [open, toggleOpen] = useRememberedOpen(`tpl:${tpl.id}`, false);
 
   return (
@@ -1513,14 +1521,19 @@ function TemplateCard({ tpl, active, value, onToggle, onChange, Section }) {
 
       {open && (
         <div style={{ marginTop: "12px" }}>
-          <tpl.Editor value={value} onChange={onChange} Section={Section} />
+          <tpl.Editor
+            value={value}
+            onChange={onChange}
+            Section={Section}
+            onReplay={onReplay}
+          />
         </div>
       )}
     </div>
   );
 }
 
-function TemplatesTab({ template, setActive, setCfg, Section }) {
+function TemplatesTab({ template, setActive, setCfg, Section, onReplay }) {
   return (
     <div
       className="templates-tab"
@@ -1535,6 +1548,7 @@ function TemplatesTab({ template, setActive, setCfg, Section }) {
           onToggle={(on) => setActive(on ? tpl.id : null)}
           onChange={(next) => setCfg(tpl.id, next)}
           Section={Section}
+          onReplay={onReplay}
         />
       ))}
     </div>
@@ -2109,12 +2123,17 @@ function morphDom(current, target) {
   }
 }
 
-function SvgPreview({ svg, alt }) {
+function SvgPreview({ svg, alt, resetKey }) {
   const containerRef = useRef(null);
+  const prevResetKeyRef = useRef(resetKey);
+  const prevViewBoxRef = useRef(null);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+
+    const isReset = prevResetKeyRef.current !== resetKey;
+    prevResetKeyRef.current = resetKey;
 
     try {
       const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
@@ -2125,8 +2144,36 @@ function SvgPreview({ svg, alt }) {
       }
 
       const currentSvg = container.querySelector("svg");
-      if (!currentSvg) {
+      const newViewBox = newSvg.getAttribute("viewBox");
+      const isLayoutChange =
+        prevViewBoxRef.current !== null &&
+        prevViewBoxRef.current !== newViewBox;
+      prevViewBoxRef.current = newViewBox;
+
+      if (!currentSvg || isReset || isLayoutChange) {
         container.replaceChildren(newSvg);
+        try {
+          if (typeof newSvg.unpauseAnimations === "function") {
+            newSvg.unpauseAnimations();
+          }
+          if (typeof newSvg.setCurrentTime === "function") {
+            newSvg.setCurrentTime(0);
+          }
+        } catch {
+          // ignore
+        }
+        requestAnimationFrame(() => {
+          try {
+            if (typeof newSvg.unpauseAnimations === "function") {
+              newSvg.unpauseAnimations();
+            }
+            if (typeof newSvg.setCurrentTime === "function") {
+              newSvg.setCurrentTime(0);
+            }
+          } catch {
+            // ignore
+          }
+        });
         return;
       }
 
@@ -2154,7 +2201,7 @@ function SvgPreview({ svg, alt }) {
     } catch {
       container.innerHTML = svg;
     }
-  }, [svg]);
+  }, [svg, resetKey]);
 
   return (
     <div
@@ -2173,6 +2220,9 @@ export default function App() {
   const [dragSentence, setDragSentence] = useState(null);
   const [importNote, setImportNote] = useState(null);
   const [config, setConfig] = useState(defaultConfig);
+  const [animNonce, setAnimNonce] = useState(0);
+
+  const resetAnimation = useCallback(() => setAnimNonce((n) => n + 1), []);
 
   const setActiveTemplate = (id) =>
     setConfig((c) => ({ ...c, template: { ...c.template, active: id } }));
@@ -2185,6 +2235,25 @@ export default function App() {
       },
     }));
   const activeTpl = getTemplate(config.template?.active);
+
+  const prevTabRef = useRef(tab);
+  const prevActiveRef = useRef(config.template?.active);
+
+  useEffect(() => {
+    const switchedToTemplates =
+      tab === "templates" &&
+      prevTabRef.current !== "templates" &&
+      config.template?.active;
+    const templateJustActivated =
+      config.template?.active &&
+      config.template?.active !== prevActiveRef.current;
+
+    if (switchedToTemplates || templateJustActivated) {
+      resetAnimation();
+    }
+    prevTabRef.current = tab;
+    prevActiveRef.current = config.template?.active;
+  }, [tab, config.template?.active, resetAnimation]);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", "dark");
@@ -2507,7 +2576,17 @@ export default function App() {
                     ? " tab-tpl-on"
                     : "")
                 }
-                onClick={() => setTab(t.id)}
+                onClick={() => {
+                  if (
+                    t.id === "templates" &&
+                    tab === "templates" &&
+                    config.template?.active
+                  ) {
+                    resetAnimation();
+                  } else {
+                    setTab(t.id);
+                  }
+                }}
               >
                 {t.label}
                 {t.id === "effects" &&
@@ -2538,6 +2617,7 @@ export default function App() {
                 setActive={setActiveTemplate}
                 setCfg={setTemplateCfg}
                 Section={Section}
+                onReplay={resetAnimation}
               />
             ) : (
               <fieldset className="tpl-lock" disabled={locked}>
@@ -3172,7 +3252,7 @@ export default function App() {
           <section className="preview">
             <h2>Preview</h2>
             <div className="stage">
-              <SvgPreview svg={svg} alt={alt} />
+              <SvgPreview svg={svg} alt={alt} resetKey={animNonce} />
             </div>
           </section>
 
