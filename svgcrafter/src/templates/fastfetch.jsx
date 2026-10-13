@@ -586,22 +586,6 @@ function Editor({ value, onChange, Section }) {
             </span>
           </div>
         </div>
-
-        <ColorField
-          label="Hexagon main tone"
-          value={value.colors.logoBase}
-          onChange={(v) => patchColor("logoBase", v)}
-        />
-        <ColorField
-          label="Hexagon inner tone"
-          value={value.colors.logoDim}
-          onChange={(v) => patchColor("logoDim", v)}
-        />
-        <ColorField
-          label="Letter accent tone"
-          value={value.colors.logoAccent}
-          onChange={(v) => patchColor("logoAccent", v)}
-        />
       </Section>
 
       <Section
@@ -778,6 +762,27 @@ function Editor({ value, onChange, Section }) {
             label="Block cursor"
             value={value.colors.cursor}
             onChange={(v) => patchColor("cursor", v)}
+          />
+        </div>
+
+        <div className="subgroup">
+          <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)", display: "block", marginBottom: "12px" }}>
+            Logo
+          </span>
+          <ColorField
+            label="Hexagon main tone"
+            value={value.colors.logoBase}
+            onChange={(v) => patchColor("logoBase", v)}
+          />
+          <ColorField
+            label="Hexagon inner tone"
+            value={value.colors.logoDim}
+            onChange={(v) => patchColor("logoDim", v)}
+          />
+          <ColorField
+            label="Letter accent tone"
+            value={value.colors.logoAccent}
+            onChange={(v) => patchColor("logoAccent", v)}
           />
         </div>
 
