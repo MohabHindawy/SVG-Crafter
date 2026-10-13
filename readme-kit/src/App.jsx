@@ -1556,7 +1556,7 @@ function TemplatesTab({ template, setActive, setCfg, Section, onReplay }) {
 }
 
 const defaultConfig = () => ({
-  sentences: ["Welcome 👋", "SVG Crafter"],
+  sentences: ["Welcome 👋", "Readme Kit"],
   sentenceAligns: ["left", "left"],
   sentenceMotions: ["float", "float"],
   sentenceIds: [uid(), uid()],
@@ -1603,13 +1603,13 @@ const b64decode = (b64) => {
 };
 
 const META_RE =
-  /<metadata id="svgcrafter-config">([A-Za-z0-9+/=]+)<\/metadata>/;
+  /<metadata id="(?:readme-kit|svgcrafter)-config">([A-Za-z0-9+/=]+)<\/metadata>/;
 
 // Embeds configuration in SVG metadata for round-trip importing; omits font binaries to reduce payload size.
 function embedConfig(svg, config) {
   const rest = { ...config };
   delete rest.embedFont;
-  const meta = `<metadata id="svgcrafter-config">${b64encode(JSON.stringify(rest))}</metadata>`;
+  const meta = `<metadata id="readme-kit-config">${b64encode(JSON.stringify(rest))}</metadata>`;
   const at = svg.indexOf(">") + 1;
   return svg.slice(0, at) + meta + svg.slice(at);
 }
@@ -2522,7 +2522,7 @@ export default function App() {
           : parsed.legacy
             ? {
                 kind: "ok",
-                msg: "Imported an earlier SVG Crafter file. Recovered settings from the artwork; effect details and speeds use defaults.",
+                msg: "Imported an earlier Readme Kit file. Recovered settings from the artwork; effect details and speeds use defaults.",
               }
             : isTpl
               ? {
@@ -3242,9 +3242,9 @@ export default function App() {
 
           <section className="export">
             <div className="repo-callout">
-              <span className="repo-callout-msg">Enjoying SVG Crafter?</span>
+              <span className="repo-callout-msg">Enjoying Readme Kit?</span>
               <a
-                href="https://github.com/MohabHindawy/SVG-Crafter"
+                href="https://github.com/MohabHindawy/readme-kit"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="repo-star-btn"

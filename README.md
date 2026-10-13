@@ -1,15 +1,15 @@
-# SVG Crafter
+# Readme Kit
 
 A frontend-only tool for building animated, custom SVG banners for your GitHub profile. 
 
-GitHub’s image proxy (camo) makes it difficult to get fonts and animations working in READMEs. SVG Crafter handles the messy parts like embedding Google Fonts as Base64 so you can focus on making your profile look good without fighting the proxy.
+GitHub’s image proxy (camo) makes it difficult to get fonts and animations working in READMEs. Readme Kit handles the messy parts like embedding Google Fonts as Base64 so you can focus on making your profile look good without fighting the proxy.
 
 ## Examples
 Here are a few designs you can easily create!
 
 | Terminal | Arcade | Clean |
 | :---: | :---: | :---: |
-| [![Terminal](./assets/terminal.svg)](https://mohabhindawy.github.io/SVG-Crafter/) | [![Arcade](./assets/sci-fi.svg)](https://mohabhindawy.github.io/SVG-Crafter/) | [![Clean](./assets/ambient.svg)](https://mohabhindawy.github.io/SVG-Crafter/) |
+| [![Terminal](./assets/terminal.svg)](https://mohabhindawy.github.io/readme-kit/) | [![Arcade](./assets/sci-fi.svg)](https://mohabhindawy.github.io/readme-kit/) | [![Clean](./assets/ambient.svg)](https://mohabhindawy.github.io/readme-kit/) |
 
 *Note: The links only work because the markdown wraps the image; GitHub's proxy strips `<a>` tags inside raw SVG files.*
 
@@ -29,17 +29,17 @@ Here are a few designs you can easily create!
 Clone the repo and run it locally:
 
 ```bash
-git clone https://github.com/MohabHindawy/SVG-Crafter.git
-cd svgcrafter
+git clone https://github.com/MohabHindawy/readme-kit.git
+cd readme-kit
 npm install
 npm run dev
 ```
 
 ## Deployment
-This is set up to deploy to GitHub Pages automatically via Actions. Pushing to `main` triggers a build (via the workflow in `.github/workflows/deploy.yml`) which runs the production build in the `svgcrafter/` folder and pushes the `dist/` output to your Pages site.
+This is set up to deploy to GitHub Pages automatically via Actions. Pushing to `main` triggers a build (via the workflow in `.github/workflows/deploy.yml`) which runs the production build in the `readme-kit/` folder and pushes the `dist/` output to your Pages site.
 
 ## How to use it
-1. Use the [Live App](https://mohabhindawy.github.io/SVG-Crafter/) to design your banner.
+1. Use the [Live App](https://mohabhindawy.github.io/readme-kit/) to design your banner.
 2. Click **Download .svg** (or copy the raw SVG code).
 3. Save the file in your repo (e.g., `assets/banner.svg`).
 4. Add the README snippet you copied:
