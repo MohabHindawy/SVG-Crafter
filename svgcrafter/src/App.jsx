@@ -2236,24 +2236,18 @@ export default function App() {
     }));
   const activeTpl = getTemplate(config.template?.active);
 
-  const prevTabRef = useRef(tab);
   const prevActiveRef = useRef(config.template?.active);
 
   useEffect(() => {
-    const switchedToTemplates =
-      tab === "templates" &&
-      prevTabRef.current !== "templates" &&
-      config.template?.active;
     const templateJustActivated =
       config.template?.active &&
       config.template?.active !== prevActiveRef.current;
 
-    if (switchedToTemplates || templateJustActivated) {
+    if (templateJustActivated) {
       resetAnimation();
     }
-    prevTabRef.current = tab;
     prevActiveRef.current = config.template?.active;
-  }, [tab, config.template?.active, resetAnimation]);
+  }, [config.template?.active, resetAnimation]);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", "dark");
@@ -2513,6 +2507,7 @@ export default function App() {
       if (parsed.config?.template?.active) {
         setTab("templates");
       }
+      resetAnimation();
       setFileName(file.name.replace(/\.svg$/i, "") || "banner");
       const isTpl = !!parsed.config?.template?.active;
       const tplName = isTpl
@@ -2576,17 +2571,7 @@ export default function App() {
                     ? " tab-tpl-on"
                     : "")
                 }
-                onClick={() => {
-                  if (
-                    t.id === "templates" &&
-                    tab === "templates" &&
-                    config.template?.active
-                  ) {
-                    resetAnimation();
-                  } else {
-                    setTab(t.id);
-                  }
-                }}
+                onClick={() => setTab(t.id)}
               >
                 {t.label}
                 {t.id === "effects" &&

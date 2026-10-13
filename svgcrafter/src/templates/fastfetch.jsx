@@ -305,12 +305,16 @@ function sanitize(raw) {
       const id = r?.id
         ? String(r.id)
         : `row-${i + 1}-${Math.random().toString(36).slice(2, 7)}`;
-      const label = stripControl(String(r?.label ?? ""))
-        .trim()
-        .slice(0, 14);
-      const value = stripControl(String(r?.value ?? ""))
-        .trim()
-        .slice(0, 38);
+      let label = stripControl(String(r?.label ?? "")).trim();
+      let value = stripControl(String(r?.value ?? "")).trim();
+      if (label.length + value.length > 55) {
+        if (label.length > 55) {
+          label = label.slice(0, 55);
+          value = "";
+        } else {
+          value = value.slice(0, 55 - label.length);
+        }
+      }
       return { id, label, value };
     })
     .filter((r, idx, arr) => {
@@ -451,11 +455,13 @@ function generate(rawCfg) {
     const y = 92 + 19 * rowIdx;
     const beginTime = (1.8 + 0.06 * rowIdx).toFixed(2) + "s";
 
-    let label = r.label.slice(0, 14);
+    let label = r.label;
     let value = r.value;
-    const sep = ": ";
-    const avail = 56 - label.length - sep.length;
-    if (value.length > avail) {
+    if (label.length > 55) {
+      label = label.slice(0, 54) + "…";
+      value = "";
+    } else if (label.length + value.length > 55) {
+      const avail = 55 - label.length;
       value = value.slice(0, Math.max(0, avail - 1)) + "…";
     }
 
@@ -671,7 +677,7 @@ function Editor({ value, onChange, Section, onReplay }) {
             style={{ display: "flex", flexDirection: "column", gap: "8px" }}
           >
             {value.rows.map((row, idx) => {
-              const totalLen = row.label.length + 2 + row.value.length;
+              const totalLen = row.label.length + row.value.length;
               return (
                 <div
                   key={row.id}
@@ -719,7 +725,7 @@ function Editor({ value, onChange, Section, onReplay }) {
                         flex: 1,
                       }}
                     >
-                      Row {idx + 1} &middot; {totalLen}/56 chars
+                      Row {idx + 1} &middot; {totalLen}/55 chars
                     </span>
                     <button
                       type="button"
@@ -736,16 +742,22 @@ function Editor({ value, onChange, Section, onReplay }) {
                     <input
                       type="text"
                       value={row.label}
-                      maxLength={14}
-                      onChange={(e) => setRow(idx, { label: e.target.value })}
+                      maxLength={Math.max(0, 55 - row.value.length)}
+                      onChange={(e) => {
+                        const maxLen = Math.max(0, 55 - row.value.length);
+                        setRow(idx, { label: e.target.value.slice(0, maxLen) });
+                      }}
                       placeholder="Label"
                       style={{ width: "35%", minWidth: "80px" }}
                     />
                     <input
                       type="text"
                       value={row.value}
-                      maxLength={38}
-                      onChange={(e) => setRow(idx, { value: e.target.value })}
+                      maxLength={Math.max(0, 55 - row.label.length)}
+                      onChange={(e) => {
+                        const maxLen = Math.max(0, 55 - row.label.length);
+                        setRow(idx, { value: e.target.value.slice(0, maxLen) });
+                      }}
                       placeholder="Value"
                       style={{ flex: 1 }}
                     />
