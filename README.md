@@ -1,7 +1,6 @@
 # Readme Kit
 
 A browser tool for building animated SVG banners for your GitHub profile.
-
 > Formerly SVG Crafter.
 
 GitHub's image proxy (camo) makes fonts and animations a pain in READMEs. Readme Kit deals with that for you, including embedding Google Fonts as Base64, so you can just focus on the design.
