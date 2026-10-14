@@ -13,10 +13,11 @@ GitHub's image proxy (camo) makes fonts and animations a pain in READMEs. Readme
 - **Templates:** ready-made designs where you only swap in your own content. Fastfetch is the first one, with more planned.
 
 ## Examples
+Here are a few designs you can make.
 
-|                        Terminal                        |                        Arcade                        |                        Clean                        |
-| :----------------------------------------------------: | :--------------------------------------------------: | :-------------------------------------------------: |
-| [Terminal](https://mohabhindawy.github.io/readme-kit/) | [Arcade](https://mohabhindawy.github.io/readme-kit/) | [Clean](https://mohabhindawy.github.io/readme-kit/) |
+| Terminal | Arcade | Clean |
+| :---: | :---: | :---: |
+| [![Terminal](./assets/terminal.svg)](https://mohabhindawy.github.io/SVG-Crafter/) | [![Arcade](./assets/sci-fi.svg)](https://mohabhindawy.github.io/SVG-Crafter/) | [![Clean](./assets/ambient.svg)](https://mohabhindawy.github.io/SVG-Crafter/) |
 
 _The links only work because the markdown wraps the image. GitHub's proxy strips `<a>` tags inside raw SVGs._
 
