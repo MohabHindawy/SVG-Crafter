@@ -1,61 +1,75 @@
-# SVG Crafter
+# Readme Kit
 
-A frontend-only tool for building animated, custom SVG banners for your GitHub profile. 
+A browser tool for building animated SVG banners for your GitHub profile.
 
-GitHub’s image proxy (camo) makes it difficult to get fonts and animations working in READMEs. SVG Crafter handles the messy parts like embedding Google Fonts as Base64 so you can focus on making your profile look good without fighting the proxy.
+> Formerly SVG Crafter.
+
+GitHub's image proxy (camo) makes fonts and animations a pain in READMEs. Readme Kit deals with that for you, including embedding Google Fonts as Base64, so you can just focus on the design.
+
+**[Open the live app](https://mohabhindawy.github.io/readme-kit/)**
+
+## What's new
+
+- **UI upgrade:** a refreshed editor with a cleaner layout and easier navigation.
+- **Templates:** ready-made designs where you only swap in your own content. Fastfetch is the first one, with more planned.
 
 ## Examples
-Here are a few designs you can easily create!
 
-| Terminal | Arcade | Clean |
-| :---: | :---: | :---: |
-| [![Terminal](./assets/terminal.svg)](https://mohabhindawy.github.io/SVG-Crafter/) | [![Arcade](./assets/sci-fi.svg)](https://mohabhindawy.github.io/SVG-Crafter/) | [![Clean](./assets/ambient.svg)](https://mohabhindawy.github.io/SVG-Crafter/) |
+|                        Terminal                        |                        Arcade                        |                        Clean                        |
+| :----------------------------------------------------: | :--------------------------------------------------: | :-------------------------------------------------: |
+| [Terminal](https://mohabhindawy.github.io/readme-kit/) | [Arcade](https://mohabhindawy.github.io/readme-kit/) | [Clean](https://mohabhindawy.github.io/readme-kit/) |
 
-*Note: The links only work because the markdown wraps the image; GitHub's proxy strips `<a>` tags inside raw SVG files.*
+_The links only work because the markdown wraps the image. GitHub's proxy strips `<a>` tags inside raw SVGs._
 
 ## What it can do
-- **Multi-Sentence:** Cycles through up to 6 custom text lines.
-- **Animations:** Supports typewriter effects (smooth or character-by-character), plus motion presets like Float, Bob, Sway, and Orbit.
-- **Paint Engine:** Create solid colors or multi-stop gradients with control over opacity, brightness, and basic animation (rotation/movement).
-- **GitHub-Friendly:** It bakes Google Fonts into the SVG markup as Base64 strings. This is the only way to get custom fonts to actually render on GitHub's READMEs.
-- **VFX Layers:** Includes common effects like Scanlines, Matrix Rain, Border Beams, and Aurora glows.
 
-## Tech Stack
-- **Framework:** React 18+ (Hooks-based state).
-- **Build Tooling:** Vite.
-- **Approach:** Everything is calculated in the browser and dispatched to a programmatic SVG generator. There is no backend, no database, and nothing is stored—it's just static HTML/JS/SVG.
+- **Multiple lines:** cycles through up to 6 lines of text.
+- **Animations:** typewriter effects (smooth or per character), plus Float, Bob, Sway and Orbit.
+- **Colours:** solid or multi-stop gradients, with opacity, brightness and basic motion.
+- **Fonts:** any Google Font, baked into the SVG as Base64 so it actually renders on GitHub.
+- **Effects:** scanlines, matrix rain, border beams and aurora glows and more.
+- **Templates:** ready-made and more complex designs where you only change the content.
 
-## Local Development
-Clone the repo and run it locally:
+## How to use it
+
+1. Design your banner in the [live app](https://mohabhindawy.github.io/readme-kit/).
+2. Download the `.svg` or copy the code.
+3. Save it in your repo, e.g. `assets/banner.svg`.
+4. Add the snippet the app gives you:
+
+```markdown
+![Banner Name](./assets/banner.svg)
+```
+
+## Known limitations
+
+- **Camo:** `animateTransform`, `stroke-dashoffset` and some CSS transforms are hit or miss. Simple rotate and opacity effects are usually fine. Push and check before relying on anything.
+- **Fonts:** only the Latin subset is fetched, and custom fonts stay at their regular weight. Templates use a monospace stack instead of an embedded font.
+- **Mobile:** drag-and-drop reordering isn't touch-friendly yet. Use the arrow buttons.
+
+## Development
+
+Built with React and Vite. Everything runs in the browser, with no backend and nothing stored.
 
 ```bash
-git clone https://github.com/MohabHindawy/SVG-Crafter.git
-cd svgcrafter
+git clone https://github.com/MohabHindawy/readme-kit.git
+cd readme-kit
 npm install
 npm run dev
 ```
 
-## Deployment
-This is set up to deploy to GitHub Pages automatically via Actions. Pushing to `main` triggers a build (via the workflow in `.github/workflows/deploy.yml`) which runs the production build in the `svgcrafter/` folder and pushes the `dist/` output to your Pages site.
+### Adding a template
 
-## How to use it
-1. Use the [Live App](https://mohabhindawy.github.io/SVG-Crafter/) to design your banner.
-2. Click **Download .svg** (or copy the raw SVG code).
-3. Save the file in your repo (e.g., `assets/banner.svg`).
-4. Add the README snippet you copied:
-   ```markdown
-   ![Banner Name](./assets/banner.svg)
-   ```
+Drop a file in `src/templates/` exporting an object with `id`, `name`, `desc`, plus `defaults()`, `sanitize(raw)`, `generate(config)`, `alt(config)` and an `Editor` component. Register it in the `TEMPLATES` list in `src/templates/index.js`. Reuse helpers from `shared.jsx` where you can.
 
-## Known Limitations
-* **GitHub's Proxy (Camo):** Some animations don't play nice with GitHub's image proxy. `animateTransform`, `stroke-dashoffset`, and some CSS transforms are hit-or-miss. Simple rotate/opacity effects are generally safe. Always push to your profile and check if it animates before relying on it.
-* **Fonts:** It only fetches the Latin subset of Google Fonts. The font weight slider is largely for system fonts; custom fonts are currently locked to their standard weight.
-* **State:** Everything is local to your browser session. If you refresh, your configuration resets.
-* **Layout:** Effects render behind the text layer. There's no Z-index control yet.
-* **Mobile:** Drag-and-drop reordering for sentence rows and gradient stops isn't fully touch-optimized; use the arrow buttons as a fallback.
+### Deployment
+
+Pushing to `main` runs `.github/workflows/deploy.yml`, which builds the `readme-kit/` folder and publishes `dist/` to GitHub Pages.
 
 ## Contributing
-Issues and PRs are welcome. If you want to add a new effect, try to keep it CSS or SMIL-only (no `<script>` tags) so it stands a chance of passing the GitHub proxy.
+
+Issues and PRs welcome. Keep new effects and templates CSS or SMIL only (no `<script>`) so they have a chance of surviving GitHub's proxy.
 
 ## License
-Distributed under the MIT License. See `LICENSE` for details.
+
+MIT. See `LICENSE`.

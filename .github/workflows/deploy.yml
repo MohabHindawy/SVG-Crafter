@@ -28,14 +28,14 @@ jobs:
         with:
           node-version: 22
           cache: 'npm'
-          cache-dependency-path: svgcrafter/package-lock.json
+          cache-dependency-path: readme-kit/package-lock.json
 
       - name: Install dependencies
-        working-directory: svgcrafter
+        working-directory: readme-kit
         run: npm ci
 
       - name: Build project
-        working-directory: svgcrafter
+        working-directory: readme-kit
         run: npm run build
 
       - name: Setup Pages
@@ -44,7 +44,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './svgcrafter/dist'
+          path: './readme-kit/dist'
 
       - name: Deploy to GitHub Pages
         id: deployment
